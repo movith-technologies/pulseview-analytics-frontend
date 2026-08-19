@@ -1,27 +1,27 @@
-"use client";
+﻿"use client";
 // =============================================================================
 // src/components/charts/spc/SpcStdDevChart.tsx
-// SPC Görünüm Modu — Standart Sapma + Cp + Cpk Grafiği
+// SPC GÃ¶rÃ¼nÃ¼m Modu â€” Standart Sapma + Cp + Cpk GrafiÄŸi
 //
-// Vue'daki StandardDeviationChart.vue'nun karşılığı.
+// Vue'daki StandardDeviationChart.vue'nun karÅŸÄ±lÄ±ÄŸÄ±.
 //
-// Grafik Yapısı:
+// Grafik YapÄ±sÄ±:
 //   X ekseni: Grup index (G1, G2, G3...)
-//   Birincil Y Ekseni (sol): Standart Sapma değerleri
-//   İkincil Y Ekseni (sağ): Cp ve Cpk değerleri
+//   Birincil Y Ekseni (sol): Standart Sapma deÄŸerleri
+//   Ä°kincil Y Ekseni (saÄŸ): Cp ve Cpk deÄŸerleri
 //
 // 3 Seri:
-//   1. Standard Deviation (mavi) — her grubun sigma değeri
-//   2. Cp (yeşil) — süreç yeterliliği
-//   3. Cpk (sarı) — merkezli süreç yeterliliği
+//   1. Standard Deviation (mavi) â€” her grubun sigma deÄŸeri
+//   2. Cp (yeÅŸil) â€” sÃ¼reÃ§ yeterliliÄŸi
+//   3. Cpk (sarÄ±) â€” merkezli sÃ¼reÃ§ yeterliliÄŸi
 //
-// Cp ve Cpk Formülleri:
-//   Cp  = (UCL - LCL) / (6 × sigma)
-//        → Süreç tolerans bandına sığıyor mu?
-//        → 1.33 üzeri → yeterli, 1.67 üzeri → mükemmel
-//   Cpk = min((UCL - mean) / (3 × sigma), (mean - LCL) / (3 × sigma))
-//        → Süreç hem toleransa sığıyor hem de ortalanmış mı?
-//        → Cpk < Cp ise süreç merkezi kaymış demektir.
+// Cp ve Cpk FormÃ¼lleri:
+//   Cp  = (UCL - LCL) / (6 Ã— sigma)
+//        â†’ SÃ¼reÃ§ tolerans bandÄ±na sÄ±ÄŸÄ±yor mu?
+//        â†’ 1.33 Ã¼zeri â†’ yeterli, 1.67 Ã¼zeri â†’ mÃ¼kemmel
+//   Cpk = min((UCL - mean) / (3 Ã— sigma), (mean - LCL) / (3 Ã— sigma))
+//        â†’ SÃ¼reÃ§ hem toleransa sÄ±ÄŸÄ±yor hem de ortalanmÄ±ÅŸ mÄ±?
+//        â†’ Cpk < Cp ise sÃ¼reÃ§ merkezi kaymÄ±ÅŸ demektir.
 // =============================================================================
 
 import { useMemo } from "react";
@@ -37,9 +37,9 @@ interface SpcStdDevChartProps {
 export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
   const options = useMemo((): Highcharts.Options => {
     const categories = series.groups.map((g) => `G${g.groupIndex}`);
-    const tolerance = series.ucl - series.lcl; // Toplam tolerans bandı
+    const tolerance = series.ucl - series.lcl; // Toplam tolerans bandÄ±
 
-    // Her grup için Cp ve Cpk hesaplanır
+    // Her grup iÃ§in Cp ve Cpk hesaplanÄ±r
     const sigmaData: number[] = [];
     const cpData:    number[] = [];
     const cpkData:   number[] = [];
@@ -48,7 +48,7 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       sigmaData.push(g.sigma);
 
       if (g.sigma === 0) {
-        // Sigma 0 ise (tüm ölçümler eşit) tanımsız → maksimum değer koy
+        // Sigma 0 ise (tÃ¼m Ã¶lÃ§Ã¼mler eÅŸit) tanÄ±msÄ±z â†’ maksimum deÄŸer koy
         cpData.push(Infinity);
         cpkData.push(Infinity);
         return;
@@ -64,7 +64,7 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       cpkData.push(parseFloat(cpk.toFixed(4)));
     });
 
-    // Cp/Cpk'nın ortalama değerlerini badge için hesapla
+    // Cp/Cpk'nÄ±n ortalama deÄŸerlerini badge iÃ§in hesapla
     const validCp  = cpData.filter(isFinite);
     const validCpk = cpkData.filter(isFinite);
     const avgCp    = validCp.length  ? validCp.reduce((a, b)  => a + b, 0) / validCp.length  : 0;
@@ -88,19 +88,19 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // ── İki Y Ekseni: sol (sigma) + sağ (Cp/Cpk) ─────────────────────
-      // Highcharts'ta birden fazla Y ekseni tanımlanabilir.
-      // Her seri "yAxis: 0" veya "yAxis: 1" ile hangi eksene bağlandığını belirtir.
+      // â”€â”€ Ä°ki Y Ekseni: sol (sigma) + saÄŸ (Cp/Cpk) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Highcharts'ta birden fazla Y ekseni tanÄ±mlanabilir.
+      // Her seri "yAxis: 0" veya "yAxis: 1" ile hangi eksene baÄŸlandÄ±ÄŸÄ±nÄ± belirtir.
       yAxis: [
-        // Birincil Y ekseni (sol) — Sigma değerleri
+        // Birincil Y ekseni (sol) â€” Sigma deÄŸerleri
         {
           title: {
-            text: "σ Std Dev",
+            text: "Ïƒ Std Dev",
             style: { color: "#3b82f6", fontSize: "10px" },
           },
           gridLineColor: "#21262d",
           labels: { style: { color: "#3b82f6", fontSize: "10px" } },
-          // Referans çizgisi: sigma'nın beklenen üst sınırı
+          // Referans Ã§izgisi: sigma'nÄ±n beklenen Ã¼st sÄ±nÄ±rÄ±
           plotLines: [
             {
               value: series.mean > 0 ? (series.ucl - series.lcl) / 6 : 0,
@@ -109,22 +109,22 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
               dashStyle: "Dash",
               zIndex: 4,
               label: {
-                text: "Expected σ",
+                text: "Expected Ïƒ",
                 style: { color: "#60a5fa", fontSize: "9px" },
               },
             },
           ],
         },
-        // İkincil Y ekseni (sağ) — Cp ve Cpk değerleri
+        // Ä°kincil Y ekseni (saÄŸ) â€” Cp ve Cpk deÄŸerleri
         {
           title: {
             text: "Cp / Cpk",
             style: { color: "#4ade80", fontSize: "10px" },
           },
-          opposite: true,         // Sağ tarafa yerleştirir
-          gridLineWidth: 0,       // İkinci eksen grid çizgisi gösterme
+          opposite: true,         // SaÄŸ tarafa yerleÅŸtirir
+          gridLineWidth: 0,       // Ä°kinci eksen grid Ã§izgisi gÃ¶sterme
           labels: { style: { color: "#8b949e", fontSize: "10px" } },
-          // Cp ≥ 1.33 = yeterli sınır — kılavuz çizgisi
+          // Cp â‰¥ 1.33 = yeterli sÄ±nÄ±r â€” kÄ±lavuz Ã§izgisi
           plotLines: [
             {
               value: 1.33,
@@ -146,8 +146,8 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "11px" },
-        shared: true,             // Birden fazla seri — tek tooltip'te göster
-        formatter: function (this: Highcharts.TooltipFormatterContextObject) {
+        shared: true,             // Birden fazla seri â€” tek tooltip'te gÃ¶ster
+        formatter: function (this: any) {
           const i = (this.points?.[0]?.point.index ?? 0);
           const g = series.groups[i];
           const cp  = cpData[i];
@@ -157,9 +157,9 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
 
           return (
             `<b>Group ${g.groupIndex}</b><br/>` +
-            `σ: <b>${g.sigma.toFixed(4)}</b><br/>` +
-            `Cp: <b style="color:${cpColor}">${isFinite(cp) ? cp.toFixed(3) : "∞"}</b><br/>` +
-            `Cpk: <b style="color:${cpkColor}">${isFinite(cpk) ? cpk.toFixed(3) : "∞"}</b>`
+            `Ïƒ: <b>${g.sigma.toFixed(4)}</b><br/>` +
+            `Cp: <b style="color:${cpColor}">${isFinite(cp) ? cp.toFixed(3) : "âˆ"}</b><br/>` +
+            `Cpk: <b style="color:${cpkColor}">${isFinite(cpk) ? cpk.toFixed(3) : "âˆ"}</b>`
           );
         },
       },
@@ -178,26 +178,26 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       },
 
       series: [
-        // Standart Sapma — Sol Y ekseni, mavi
+        // Standart Sapma â€” Sol Y ekseni, mavi
         {
           type: "line",
-          name: "Std Dev (σ)",
-          yAxis: 0,             // Birincil (sol) eksene bağlı
+          name: "Std Dev (Ïƒ)",
+          yAxis: 0,             // Birincil (sol) eksene baÄŸlÄ±
           color: "#3b82f6",
           data: sigmaData,
           zIndex: 3,
         },
-        // Cp — Sağ Y ekseni, yeşil
+        // Cp â€” SaÄŸ Y ekseni, yeÅŸil
         {
           type: "line",
           name: "Cp",
-          yAxis: 1,             // İkincil (sağ) eksene bağlı
+          yAxis: 1,             // Ä°kincil (saÄŸ) eksene baÄŸlÄ±
           color: "#4ade80",
           dashStyle: "ShortDash",
           data: cpData.map((v) => (isFinite(v) ? v : null)),
           zIndex: 2,
         },
-        // Cpk — Sağ Y ekseni, sarı
+        // Cpk â€” SaÄŸ Y ekseni, sarÄ±
         {
           type: "line",
           name: "Cpk",
@@ -218,3 +218,5 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
     />
   );
 }
+
+

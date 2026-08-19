@@ -1,18 +1,6 @@
-// =============================================================================
+﻿// =============================================================================
 // src/lib/mappers/spcMapper.ts
-// API ↔ UI Dönüşüm Katmanı (Mapper)
-//
-// Bu dosyanın tek sorumluluğu: Ham API alan adlarını temiz UI adlarına
-// dönüştürmek. Özellikle AverageChart.vue'dan keşfedilen "renk tersliği"
-// burada düzeltilir.
-//
-// Terslik özeti:
-//   API.Max → UI.ucl          (yeşil dar bant — Control Limit Üst)
-//   API.Min → UI.lcl          (yeşil dar bant — Control Limit Alt)
-//   API.PreMax → UI.monitoringMax  (sarı geniş bant — Monitoring Limit Üst)
-//   API.PreMin → UI.monitoringMin  (sarı geniş bant — Monitoring Limit Alt)
-//   API.UCL → UI.ucl          (Individual Values'ta zaten doğru geliyor)
-//   API.LCL → UI.lcl          (Individual Values'ta zaten doğru geliyor)
+// API → UI Dönüşüm Katmanı (Mapper)
 // =============================================================================
 
 import type {
@@ -23,6 +11,10 @@ import type {
   ApiMeasurement,
   IndividualValueSeries,
   SpcSeries,
+  PalletSeries,
+  PalletPoint,
+  CompareSeries,
+  ComparePoint,
   SelectOption,
   MeasurementOption,
   DataPoint,
@@ -32,99 +24,53 @@ import type {
 // İSTASYON / ÜRÜN / ÖLÇÜM MAPPER'LARI
 // ---------------------------------------------------------------------------
 
-/**
- * Ham istasyon listesini select dropdown için hazırlar.
- */
-export function mapStationsToOptions(
-  stations: ApiStation[]
-): SelectOption<number>[] {
+export function mapStationsToOptions(stations: ApiStation[]): SelectOption<number>[] {
   return stations.map((s) => ({
     value: s.StationID,
     label: `${s.StationName} (${s.WorkcenterName} — Line ${s.LineName})`,
   }));
 }
 
-/**
- * Ham ürün listesini select dropdown için hazırlar.
- */
-export function mapProductsToOptions(
-  products: ApiProduct[]
-): SelectOption<number>[] {
-  return products.map((p) => ({
-    value: p.Id,
-    label: p.Name,
-  }));
+export function mapProductsToOptions(products: ApiProduct[]): SelectOption<number>[] {
+  return products.map((p) => ({ value: p.Id, label: p.Name }));
 }
 
-/**
- * Ham ölçüm listesini multi-select için hazırlar.
- */
-export function mapMeasurementsToOptions(
-  measurements: ApiMeasurement[]
-): MeasurementOption[] {
+export function mapMeasurementsToOptions(measurements: ApiMeasurement[]): MeasurementOption[] {
   return measurements
     .filter((m) => m.IsVisible)
-    .map((m) => ({
-      id: m.ID,
-      name: m.Name,
-    }));
+    .map((m) => ({ id: m.ID, name: m.Name }));
 }
 
 // ---------------------------------------------------------------------------
 // INDIVIDUAL VALUES MAPPER
-// Bu fonksiyon Individual Values API yanıtını temiz UI tipine dönüştürür.
-// UCL/LCL alanları Individual Values API'sinde ZATEn doğru isimlendirilmiş.
 // ---------------------------------------------------------------------------
 
-/**
- * Ham API Individual Values serisini temiz UI tipine dönüştürür.
- *
- * Ham API'den gelen alanlar ve yeni UI karşılıkları:
- * ```
- * ApiIndividualValueSeries.UCL  → IndividualValueSeries.ucl
- * ApiIndividualValueSeries.LCL  → IndividualValueSeries.lcl
- * ApiIndividualValueSeries.Max  → IndividualValueSeries.monitoringMax
- * ApiIndividualValueSeries.Min  → IndividualValueSeries.monitoringMin
- * ApiIndividualValueSeries.Avg  → IndividualValueSeries.mean
- * ```
- */
-export function mapIndividualValueSeries(
-  raw: ApiIndividualValueSeries
-): IndividualValueSeries {
+export function mapIndividualValueSeries(raw: ApiIndividualValueSeries): IndividualValueSeries {
   return {
     measurementName: raw.MeasurementName,
     measureTypeId: raw.MeasureTypeId,
-
-    // Control Limits — Dar yeşil bant
     ucl: raw.UCL,
     lcl: raw.LCL,
-
-    // Monitoring Limits — Geniş sarı bant
-    // Individual Values API'sinde Max/Min monitoring limitleridir
     monitoringMax: raw.Max,
     monitoringMin: raw.Min,
-
-    // İstatistikler
     mean: raw.Avg,
     ppm: raw.PPM,
     okCount: raw.OK,
     nokCount: raw.NOK,
-
-    // Veri noktaları
     dataPoints: raw.IndividualValues.map(
       (point): DataPoint => ({
         date: point.Date,
         value: point.Value,
-        palletNumber: point.Piece,
-        productId: point.Product,
+        // ÖNEMLİ FALLBACK: e.Pallet ?? e.Piece ?? null
+        // Eski PalletScatterChart.vue'daki "e.Pallet" kullanımını karşılar.
+        // Backend bazı endpoint'lerde Piece, bazılarında Pallet döndürebilir.
+        palletNumber: point.Pallet ?? point.Piece ?? null,
+        productId: point.ProdId ?? point.Product,
       })
     ),
   };
 }
 
-/**
- * Birden fazla seriyi dönüştürür.
- */
 export function mapIndividualValueSeriesArray(
   rawArray: ApiIndividualValueSeries[]
 ): IndividualValueSeries[] {
@@ -133,42 +79,17 @@ export function mapIndividualValueSeriesArray(
 
 // ---------------------------------------------------------------------------
 // SPC VALUES MAPPER
-// Bu fonksiyon SPC API yanıtını temiz UI tipine dönüştürür.
-// ⚠️  KRİTİK: SPC API'sinde Max/Min ve PreMax/PreMin TERSINE İSİMLENDİRİLMİŞ
 // ---------------------------------------------------------------------------
 
-/**
- * Ham API SPC serisini temiz UI tipine dönüştürür.
- *
- * AverageChart.vue'dan tersine mühendislik ile keşfedilen eşleşme:
- * ```
- * ApiSpcSeries.Max     → SpcSeries.ucl            (plotBands: from=Max, to=Min → yeşil dar bant)
- * ApiSpcSeries.Min     → SpcSeries.lcl             (plotBands: from=Max, to=Min → yeşil dar bant)
- * ApiSpcSeries.PreMax  → SpcSeries.monitoringMax   (plotBands: from=PreMax, to=PreMin → sarı geniş bant)
- * ApiSpcSeries.PreMin  → SpcSeries.monitoringMin   (plotBands: from=PreMax, to=PreMin → sarı geniş bant)
- * ApiSpcSeries.AverageSpc → SpcSeries.mean         (kırmızı çizgi)
- * SpcValues[i].Avg     → groups[i].avg             (mavi x-bar grafiği)
- * SpcValues[i].Sigma   → groups[i].sigma           (standart sapma grafiği)
- * ```
- */
 export function mapSpcSeries(raw: ApiSpcSeries): SpcSeries {
   return {
     measurementName: raw.MeasurementName,
     measureTypeId: raw.MeasureTypeId,
-
-    // ⚠️  TERSLIK DÜZELTİLİYOR:
-    // SPC API'sinde "Max/Min" yeşil banttır (Control Limits = UCL/LCL)
     ucl: raw.Max,
     lcl: raw.Min,
-
-    // SPC API'sinde "PreMax/PreMin" sarı banttır (Monitoring Limits)
     monitoringMax: raw.PreMax,
     monitoringMin: raw.PreMin,
-
-    // Genel ortalama
     mean: raw.AverageSpc,
-
-    // Alt gruplar (her biri 200 ölçüm)
     groups: raw.SpcValues.map((g) => ({
       groupIndex: g.GroupIndex,
       avg: g.Avg,
@@ -177,9 +98,87 @@ export function mapSpcSeries(raw: ApiSpcSeries): SpcSeries {
   };
 }
 
-/**
- * Birden fazla SPC serisini dönüştürür.
- */
 export function mapSpcSeriesArray(rawArray: ApiSpcSeries[]): SpcSeries[] {
   return rawArray.map(mapSpcSeries);
+}
+
+// ---------------------------------------------------------------------------
+// PALLET ANALİZİ MAPPER
+// IndividualValueSeries → PalletSeries
+// Bu mapper IndividualValues verisini PalletChart'a uygun formata dönüştürür.
+// X ekseni = palletNumber (Pallet ?? Piece fallback zaten DataPoint'te uygulandı)
+// ---------------------------------------------------------------------------
+
+export function mapIndividualToPalletSeries(series: IndividualValueSeries): PalletSeries {
+  let maxPalletValue = 0;
+
+  const points: PalletPoint[] = series.dataPoints
+    .filter((p) => p.palletNumber !== null)
+    .map((p): PalletPoint => {
+      const palletNum = p.palletNumber as number;
+      if (palletNum > maxPalletValue) maxPalletValue = palletNum;
+      return {
+        x: palletNum,
+        y: p.value,
+        prodId: p.productId,
+        pallet: palletNum,
+      };
+    });
+
+  return {
+    measurementName: series.measurementName,
+    measureTypeId: series.measureTypeId,
+    maxPalletValue,
+    monitoringMax: series.monitoringMax,
+    monitoringMin: series.monitoringMin,
+    mean: series.mean,
+    points,
+  };
+}
+
+export function mapIndividualToPalletSeriesArray(
+  seriesArray: IndividualValueSeries[]
+): PalletSeries[] {
+  return seriesArray.map(mapIndividualToPalletSeries);
+}
+
+// ---------------------------------------------------------------------------
+// COMPARE ANALİZİ MAPPER
+// IndividualValueSeries[] → CompareSeries[]
+// Birden fazla ölçüm tipi tek bir grafikte üst üste gösterilir.
+// X ekseni = Unix timestamp (ms), timezone offset uygulanır.
+// ---------------------------------------------------------------------------
+
+export function mapIndividualToCompareSeries(series: IndividualValueSeries): CompareSeries {
+  const tzOffsetMs = new Date().getTimezoneOffset() * 60 * 1000;
+
+  const points: ComparePoint[] = series.dataPoints.map((p): ComparePoint => {
+    const date = new Date(p.date);
+    const formattedDate = new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "full",
+      timeStyle: "medium",
+    }).format(date);
+
+    return {
+      x: date.getTime() - tzOffsetMs,
+      y: p.value,
+      pallet: p.palletNumber,
+      date: formattedDate,
+    };
+  });
+
+  return {
+    measurementName: series.measurementName,
+    measureTypeId: series.measureTypeId,
+    monitoringMax: series.monitoringMax,
+    monitoringMin: series.monitoringMin,
+    mean: series.mean,
+    points,
+  };
+}
+
+export function mapIndividualToCompareSeriesArray(
+  seriesArray: IndividualValueSeries[]
+): CompareSeries[] {
+  return seriesArray.map(mapIndividualToCompareSeries);
 }

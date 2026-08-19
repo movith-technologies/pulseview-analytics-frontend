@@ -1,4 +1,4 @@
-// =============================================================================
+﻿// =============================================================================
 // src/types/spc.ts
 // TypeScript Sözlüğü — Ham API tipleri ve temiz UI tipleri ayrı tutulur.
 // =============================================================================
@@ -13,12 +13,9 @@ export type LayoutType =
   | "Compare Analysis";
 
 // ---------------------------------------------------------------------------
-// 2. RAW API TİPLERİ
-// Bunlar backend'in döndürdüğü alan adlarını birebir yansıtır.
-// Değiştirme! Gerçek backend geldiğinde bu yapı korunacak.
+// 2. RAW API TIPLERI
 // ---------------------------------------------------------------------------
 
-/** GetStations API yanıtındaki her istasyon kaydı */
 export interface ApiStation {
   PlantID: number;
   LineID: number;
@@ -32,10 +29,9 @@ export interface ApiStation {
   HASSPC: boolean;
 }
 
-/** GetIndividualProducts API yanıtı */
 export interface ApiProductsResponse {
-  StartDate: string;   // ISO 8601
-  EndDate: string;     // ISO 8601
+  StartDate: string;
+  EndDate: string;
   ProductList: ApiProduct[];
 }
 export interface ApiProduct {
@@ -43,7 +39,6 @@ export interface ApiProduct {
   Name: string;
 }
 
-/** GetMeasurements API yanıtındaki her ölçüm tipi */
 export interface ApiMeasurement {
   ID: number;
   StationID: number;
@@ -52,85 +47,62 @@ export interface ApiMeasurement {
 }
 
 /**
- * Ham tekil değer noktası (DataList içindeki her satır).
- * Pallet -> palet numarası, Piece -> mandren/navetta ID
+ * Ham tekil veri noktası.
+ * Pallet -> palet numarası, Piece -> mandren/navetta ID.
+ * ÖNEMLİ: API bazen Pallet, bazen Piece döndürür.
+ * Mapper'da: palletNumber = e.Pallet ?? e.Piece ?? null (fallback zinciri)
  */
 export interface ApiDataPoint {
-  Date: string;        // ISO 8601
+  Date: string;
   Value: number;
   Product: number;
   MeasurementName: string;
-  Piece: number | null;
+  Pallet?: number | null;
+  Piece?: number | null;
+  ProdId?: number;
   MandrenNavetta?: string;
 }
 
-/**
- * GetIndividualValues API yanıtındaki her ölçüm serisi.
- *
- * ⚠️  KRITIK TERSLIK NOTU:
- *   - "UCL" alanı → Gerçek UCL (Control Limit Üst)
- *   - "LCL" alanı → Gerçek LCL (Control Limit Alt)
- *   - "Max" alanı → Monitoring Limit Maks (geniş sarı bant ÜSTÜ)
- *   - "Min" alanı → Monitoring Limit Min  (geniş sarı bant ALTI)
- *   - "Avg" / "mean" → Genel ortalama
- * AverageChart.vue'da "data.Max" yeşil bant (UCL), "data.PreMax" sarı bant
- * (monitoringMax) olarak kullanılmıştır. Bu isimler artık mapper'da düzeltilir.
- */
 export interface ApiIndividualValueSeries {
   MeasurementName: string;
   MeasureTypeId: number;
-  UCL: number;           // Control Limit Üst
-  LCL: number;           // Control Limit Alt
-  Avg: number;           // Genel ortalama (mean)
-  Max: number;           // Monitoring Limit Üst (geniş sarı bant)
-  Min: number;           // Monitoring Limit Alt (geniş sarı bant)
+  UCL: number;
+  LCL: number;
+  Avg: number;
+  Max: number;
+  Min: number;
   PPM: number;
   OK: number;
   NOK: number;
   IndividualValues: ApiDataPoint[];
 }
 
-/**
- * GetSPCValues API yanıtındaki her grup kaydı (200'lük örneklem).
- *
- * ⚠️  KRITIK TERSLIK NOTU (AverageChart.vue'dan tersine mühendislik):
- *   data.Max   → yeşil band → UCL (Control Limit Üst)
- *   data.Min   → yeşil band → LCL (Control Limit Alt)
- *   data.PreMax → sarı band → Monitoring Max
- *   data.PreMin → sarı band → Monitoring Min
- *   data.AverageSpc → kırmızı çizgi → genel ortalama
- *   data.SpcValues[i].Avg → mavi çizgi → grup ortalaması
- *   data.SpcValues[i].Sigma → grup standart sapması
- */
 export interface ApiSpcGroup {
-  Avg: number;    // Bu grubun ortalaması (x-bar)
-  Sigma: number;  // Bu grubun standart sapması
+  Avg: number;
+  Sigma: number;
   GroupIndex: number;
 }
 
 export interface ApiSpcSeries {
   MeasurementName: string;
   MeasureTypeId: number;
-  Max: number;        // → UCL (Control Limit Üst) — YEŞİL bant
-  Min: number;        // → LCL (Control Limit Alt) — YEŞİL bant
-  PreMax: number;     // → Monitoring Max — SARI bant
-  PreMin: number;     // → Monitoring Min — SARI bant
-  AverageSpc: number; // → Genel ortalama — KIRMIZI çizgi
+  Max: number;
+  Min: number;
+  PreMax: number;
+  PreMin: number;
+  AverageSpc: number;
   SpcValues: ApiSpcGroup[];
 }
 
 // ---------------------------------------------------------------------------
-// 3. UI TİPLERİ (Mapper çıktısı — temiz isimler)
-// Grafik bileşenleri yalnızca bu tipleri kullanır.
+// 3. UI TIPLERI (Mapper çıktısı — temiz isimler)
 // ---------------------------------------------------------------------------
 
-/** Seçilebilir bir dropdown/select seçeneği */
 export interface SelectOption<T = number> {
   value: T;
   label: string;
 }
 
-/** Çoklu seçim için ölçüm tipi seçeneği */
 export interface MeasurementOption {
   id: number;
   name: string;
@@ -138,73 +110,135 @@ export interface MeasurementOption {
 
 /** Tekil değer — tek bir zaman noktasındaki ölçüm */
 export interface DataPoint {
-  date: string;        // ISO 8601
+  date: string;
   value: number;
-  palletNumber: number | null;  // Palet analizi için
+  /**
+   * Palet numarası.
+   * Kaynak: ApiDataPoint.Pallet ?? ApiDataPoint.Piece ?? null
+   * PalletChart bu alanı X ekseni olarak kullanır.
+   */
+  palletNumber: number | null;
   productId: number;
 }
 
-/**
- * Temiz adlandırılmış Individual Values serisi.
- * Grafik bileşeni bu tipi prop olarak alır.
- */
+/** Temiz adlandırılmış Individual Values serisi */
 export interface IndividualValueSeries {
   measurementName: string;
   measureTypeId: number;
-  // Kontrol Limitleri (Control Limits) — DAR YEŞİL bant
   ucl: number;
   lcl: number;
-  // İzleme Limitleri (Monitoring Limits) — GENİŞ SARI bant
   monitoringMax: number;
   monitoringMin: number;
-  // İstatistikler
   mean: number;
   ppm: number;
   okCount: number;
   nokCount: number;
-  // Veri noktaları
   dataPoints: DataPoint[];
 }
 
-/** Temiz adlandırılmış SPC serisi */
+// ---------------------------------------------------------------------------
+// 4. PALLET ANALİZİ TİPLERİ
+// ---------------------------------------------------------------------------
+
+/**
+ * Scatter plot için hazırlanmış tek palet noktası.
+ * x = palletNumber, y = value
+ * PalletChart bu yapıyı Highcharts scatter serisi olarak kullanır.
+ */
+export interface PalletPoint {
+  /** X ekseni: palet numarası (Pallet ?? Piece fallback) */
+  x: number;
+  /** Y ekseni: ölçüm değeri */
+  y: number;
+  /** Tooltip'te gösterilecek ürün ID'si */
+  prodId: number;
+  /** Tooltip'te gösterilecek palet numarası */
+  pallet: number;
+}
+
+/**
+ * PalletChart bileşenine iletilen tam seri verisi.
+ * IndividualValueSeries'ten türetilir.
+ */
+export interface PalletSeries {
+  measurementName: string;
+  measureTypeId: number;
+  /** X ekseninin üst sınırı: maxPalletNumber + 1 */
+  maxPalletValue: number;
+  /** Monitoring Limit Üst (kırmızı çizgi) */
+  monitoringMax: number;
+  /** Monitoring Limit Alt (kırmızı çizgi) */
+  monitoringMin: number;
+  /** Ortalama (turuncu kesikli) */
+  mean: number;
+  /** Scatter noktaları */
+  points: PalletPoint[];
+}
+
+// ---------------------------------------------------------------------------
+// 5. COMPARE ANALİZİ TİPLERİ
+// ---------------------------------------------------------------------------
+
+/**
+ * Compare Analysis için zaman-eksenli tek nokta.
+ * x = Unix timestamp (ms), y = değer
+ */
+export interface ComparePoint {
+  x: number;     // Unix ms — Highcharts datetime ekseni
+  y: number;
+  pallet: number | null;
+  date: string;  // Formatlanmış string (tooltip)
+}
+
+/**
+ * CompareChart'ın tek serisi (her ölçüm tipi bir seri).
+ */
+export interface CompareSeries {
+  measurementName: string;
+  measureTypeId: number;
+  /** Monitoring Limit Üst — ilk seriden alınır */
+  monitoringMax: number;
+  /** Monitoring Limit Alt */
+  monitoringMin: number;
+  /** Ortalama */
+  mean: number;
+  points: ComparePoint[];
+}
+
+// ---------------------------------------------------------------------------
+// 6. SPC TİPLERİ
+// ---------------------------------------------------------------------------
+
 export interface SpcSeries {
   measurementName: string;
   measureTypeId: number;
-  // Kontrol Limitleri — DAR YEŞİL bant
   ucl: number;
   lcl: number;
-  // İzleme Limitleri — GENİŞ SARI bant
   monitoringMax: number;
   monitoringMin: number;
-  // Genel ortalama — KIRMIZI çizgi
   mean: number;
-  // 200'lük alt gruplar
   groups: SpcGroup[];
 }
 
-/** SPC alt grubu (200 ölçümden hesaplanmış) */
 export interface SpcGroup {
   groupIndex: number;
-  avg: number;    // x-bar
-  sigma: number;  // standart sapma
+  avg: number;
+  sigma: number;
 }
 
 // ---------------------------------------------------------------------------
-// 4. STORE TİPLERİ
+// 7. STORE TİPLERİ
 // ---------------------------------------------------------------------------
 
-/** Zustand store'unun şekli */
 export interface SpcStoreState {
   layoutType: LayoutType;
   stationId: number | null;
   populationSize: number;
   productId: number | null;
   selectedMeasurements: MeasurementOption[];
-  // Filtre geçmişi (datalar buradan tetiklenir)
   committedFilters: CommittedFilters | null;
 }
 
-/** GET butonuna basıldığında store'a "commit" edilen filtreler */
 export interface CommittedFilters {
   layoutType: LayoutType;
   stationId: number;

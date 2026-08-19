@@ -1,20 +1,20 @@
-"use client";
+﻿"use client";
 // =============================================================================
 // src/components/charts/individual/HistogramChart.tsx
-// Individual Values — Frekans Dağılımı Yatay Bar Grafiği
+// Individual Values â€” Frekans DaÄŸÄ±lÄ±mÄ± Yatay Bar GrafiÄŸi
 //
-// Histogram Mantığı (Highcharts tarafında yapılır):
-//   1. Veri noktaları [monitoringMin, monitoringMax] aralığında dağılır.
-//   2. Bu aralık eşit genişlikte BUCKET_COUNT (varsayılan 15) dilime bölünür.
-//   3. Her veri noktası hangi dilime düştüğüne bakılır → o dilimin sayacı artar.
-//   4. Sonuç: [{ name: "350k–360k", y: 42 }, ...] formatında veri dizisi.
-//   5. Highcharts `bar` tipi (yatay) ile bu veri görselleştirilir.
+// Histogram MantÄ±ÄŸÄ± (Highcharts tarafÄ±nda yapÄ±lÄ±r):
+//   1. Veri noktalarÄ± [monitoringMin, monitoringMax] aralÄ±ÄŸÄ±nda daÄŸÄ±lÄ±r.
+//   2. Bu aralÄ±k eÅŸit geniÅŸlikte BUCKET_COUNT (varsayÄ±lan 15) dilime bÃ¶lÃ¼nÃ¼r.
+//   3. Her veri noktasÄ± hangi dilime dÃ¼ÅŸtÃ¼ÄŸÃ¼ne bakÄ±lÄ±r â†’ o dilimin sayacÄ± artar.
+//   4. SonuÃ§: [{ name: "350kâ€“360k", y: 42 }, ...] formatÄ±nda veri dizisi.
+//   5. Highcharts `bar` tipi (yatay) ile bu veri gÃ¶rselleÅŸtirilir.
 //
-// Renk Kodlaması:
-//   - UCL'nin üstünde → kırmızı (control dışı, yüksek)
-//   - LCL'nin altında → kırmızı (control dışı, düşük)
-//   - UCL-LCL arası  → yeşil (kontrol içi)
-//   - monitoringMax/Min dışı → koyu kırmızı (kritik)
+// Renk KodlamasÄ±:
+//   - UCL'nin Ã¼stÃ¼nde â†’ kÄ±rmÄ±zÄ± (control dÄ±ÅŸÄ±, yÃ¼ksek)
+//   - LCL'nin altÄ±nda â†’ kÄ±rmÄ±zÄ± (control dÄ±ÅŸÄ±, dÃ¼ÅŸÃ¼k)
+//   - UCL-LCL arasÄ±  â†’ yeÅŸil (kontrol iÃ§i)
+//   - monitoringMax/Min dÄ±ÅŸÄ± â†’ koyu kÄ±rmÄ±zÄ± (kritik)
 // =============================================================================
 
 import { useMemo } from "react";
@@ -22,14 +22,14 @@ import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import type { IndividualValueSeries } from "@/types/spc";
 
-const BUCKET_COUNT = 15; // Histogram dilim sayısı
+const BUCKET_COUNT = 15; // Histogram dilim sayÄ±sÄ±
 
 interface HistogramChartProps {
   series: IndividualValueSeries;
   height?: number;
 }
 
-/** Bir değerin hangi renk bölgesinde olduğunu belirler */
+/** Bir deÄŸerin hangi renk bÃ¶lgesinde olduÄŸunu belirler */
 function getBucketColor(
   bucketMid: number,
   lcl: number,
@@ -38,35 +38,35 @@ function getBucketColor(
   monitoringMax: number
 ): string {
   if (bucketMid < monitoringMin || bucketMid > monitoringMax)
-    return "#7f1d1d"; // Koyu kırmızı — kritik monitoring dışı
+    return "#7f1d1d"; // Koyu kÄ±rmÄ±zÄ± â€” kritik monitoring dÄ±ÅŸÄ±
   if (bucketMid < lcl || bucketMid > ucl)
-    return "#f87171"; // Açık kırmızı — warning bölgesi
-  return "#4ade80";   // Yeşil — kontrol içi
+    return "#f87171"; // AÃ§Ä±k kÄ±rmÄ±zÄ± â€” warning bÃ¶lgesi
+  return "#4ade80";   // YeÅŸil â€” kontrol iÃ§i
 }
 
 export function HistogramChart({ series, height = 300 }: HistogramChartProps) {
   const options = useMemo((): Highcharts.Options => {
     const values = series.dataPoints.map((p) => p.value);
 
-    // Histogram sınırları: verinin gerçek min/max'ı ile
-    // monitoring limitlerinin birleşimi (daha geniş olan seçilir)
+    // Histogram sÄ±nÄ±rlarÄ±: verinin gerÃ§ek min/max'Ä± ile
+    // monitoring limitlerinin birleÅŸimi (daha geniÅŸ olan seÃ§ilir)
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
     const rangeMin = Math.min(dataMin, series.monitoringMin);
     const rangeMax = Math.max(dataMax, series.monitoringMax);
     const bucketWidth = (rangeMax - rangeMin) / BUCKET_COUNT;
 
-    // ── Kova (bucket) hesaplama ──────────────────────────────────────────
-    // Her kova: { label: "350k–360k", count: 42, midpoint: 355k }
+    // â”€â”€ Kova (bucket) hesaplama â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Her kova: { label: "350kâ€“360k", count: 42, midpoint: 355k }
     const buckets = Array.from({ length: BUCKET_COUNT }, (_, i) => {
       const low  = rangeMin + i * bucketWidth;
       const high = low + bucketWidth;
       const mid  = (low + high) / 2;
 
-      // Bu dilime düşen değer sayısı
+      // Bu dilime dÃ¼ÅŸen deÄŸer sayÄ±sÄ±
       const count = values.filter((v) => v >= low && (i === BUCKET_COUNT - 1 ? v <= high : v < high)).length;
 
-      // Sayı formatı: büyük sayılar için K/M kısaltması
+      // SayÄ± formatÄ±: bÃ¼yÃ¼k sayÄ±lar iÃ§in K/M kÄ±saltmasÄ±
       const fmt = (n: number) =>
         Math.abs(n) >= 1_000_000
           ? `${(n / 1_000_000).toFixed(1)}M`
@@ -75,7 +75,7 @@ export function HistogramChart({ series, height = 300 }: HistogramChartProps) {
           : n.toFixed(1);
 
       return {
-        name: `${fmt(low)} – ${fmt(high)}`,
+        name: `${fmt(low)} â€“ ${fmt(high)}`,
         y: count,
         mid,
         color: getBucketColor(mid, series.lcl, series.ucl, series.monitoringMin, series.monitoringMax),
@@ -93,10 +93,10 @@ export function HistogramChart({ series, height = 300 }: HistogramChartProps) {
       title:   { text: undefined },
       credits: { enabled: false },
 
-      // ── X Ekseni (yatay bar'da bu aslında Y yönünde görünür) ──────────
-      // Highcharts'ta bar tipinde X ve Y eksenleri görsel olarak değişir:
-      // xAxis → kategoriler (dilim isimleri) dikey sıralanır
-      // yAxis → sayı değerleri yatay gösterilir
+      // â”€â”€ X Ekseni (yatay bar'da bu aslÄ±nda Y yÃ¶nÃ¼nde gÃ¶rÃ¼nÃ¼r) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Highcharts'ta bar tipinde X ve Y eksenleri gÃ¶rsel olarak deÄŸiÅŸir:
+      // xAxis â†’ kategoriler (dilim isimleri) dikey sÄ±ralanÄ±r
+      // yAxis â†’ sayÄ± deÄŸerleri yatay gÃ¶sterilir
       xAxis: {
         categories: buckets.map((b) => b.name),
         lineColor: "#30363d",
@@ -116,7 +116,7 @@ export function HistogramChart({ series, height = 300 }: HistogramChartProps) {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "11px" },
-        formatter: function (this: Highcharts.TooltipFormatterContextObject) {
+        formatter: function (this: any) {
           const b = buckets[this.point.index];
           const pct = values.length > 0 ? ((b.y / values.length) * 100).toFixed(1) : "0";
           return `<b>${b.name}</b><br/><b>${b.y}</b> measurements (${pct}%)`;
@@ -156,3 +156,5 @@ export function HistogramChart({ series, height = 300 }: HistogramChartProps) {
     />
   );
 }
+
+
