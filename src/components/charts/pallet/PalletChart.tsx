@@ -1,26 +1,23 @@
 ﻿"use client";
 // =============================================================================
 // src/components/charts/pallet/PalletChart.tsx
-// Pallet Analysis Scatter Plot
+// Pallet Analysis — X=Palet No, Y=Değer Scatter Plot
 //
 // Vue karşılığı: PalletScatterChart.vue
 //
-// İş kuralları:
-//   - X ekseni: palet numarası (0..maxPalletValue+1)
-//   - Y ekseni: ölçüm değeri
-//   - Scatter tipi: her nokta bir ürün ölçümü
-//   - plotLines: monitoringMax (kırmızı), mean (turuncu), monitoringMin (kırmızı)
-//   - turboThreshold: 30000 (büyük veri seti desteği)
-//   - Tooltip: Value + ProdID + Pallet
-//
-// Pallet ?? Piece fallback mantığı:
-//   PalletSeries.points[i].x zaten mapper'da uygulanmış.
+// Özellikler:
+//   - useChartReflow: ResizeObserver ile otomatik reflow
+//   - Boost modülü: WebGL ile 30k+ palet noktası
+//   - boostThreshold: 1000+ nokta için WebGL hızlandırma
+//   - X ekseni: Palet numarası (0 → maxPalletValue+1)
+//   - Y ekseni: Ölçüm değeri + kırmızı max/min çizgileri, turuncu mean
 // =============================================================================
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import type { PalletSeries } from "@/types/spc";
+import { useChartReflow } from "@/hooks/useChartReflow";
 
 interface PalletChartProps {
   series: PalletSeries;
@@ -28,6 +25,9 @@ interface PalletChartProps {
 }
 
 export function PalletChart({ series, height = 330 }: PalletChartProps) {
+  const chartRef = useRef<HighchartsReact.RefObject>(null);
+  const containerRef = useChartReflow<HTMLDivElement>(chartRef);
+
   const options = useMemo((): Highcharts.Options => {
     const scatterData = series.points.map((p) => ({
       x: p.x,
@@ -50,7 +50,7 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
       title: { text: undefined },
       credits: { enabled: false },
 
-      // ─── X Ekseni: Palet Numarası ─────────────────────────────────────────
+      // ═══ X Ekseni: Palet Numarası ═════════════════════════════════════════
       xAxis: {
         min: 0,
         max: series.maxPalletValue + 1,
@@ -67,7 +67,7 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // ─── Y Ekseni: Ölçüm Değeri + Referans Çizgileri ─────────────────────
+      // ═══ Y Ekseni: Ölçüm Değeri + Referans Çizgileri ════════════════════
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
@@ -114,23 +114,29 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
         ],
       },
 
-      // ─── Tooltip ──────────────────────────────────────────────────────────
+      // ═══ Tooltip ══════════════════════════════════════════════════════════
       tooltip: {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        formatter: function (this: any) {
-          const custom = this.point?.custom as { prodId: number; pallet: number } | undefined;
+        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        function (this: any) {
+          const custom = (this.point as any).custom;
           return (
             `<b>Value:</b> ${(this.y as number).toFixed(4)}<br/>` +
-            `<span style="color:#8b949e">ProdID:</span> ${custom?.prodId ?? "—"}<br/>` +
+            `<span style="color:#8b949e">ProdID:</span> ${custom?.prodId ?? "-"}<br/>` +
             `<span style="color:#8b949e">Pallet:</span> ${custom?.pallet ?? this.x}`
           );
         },
       },
 
       legend: { enabled: false },
+
+      // ═══ Boost: WebGL ile büyük nokta setleri ════════════════════════════
+      boost: {
+        useGPUTranslations: true,
+        usePreallocated: true,
+      },
 
       plotOptions: {
         scatter: {
@@ -152,11 +158,6 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
         },
       },
 
-      boost: {
-        useGPUTranslations: true,
-        usePreallocated: true,
-      },
-
       responsive: {
         rules: [
           {
@@ -171,15 +172,23 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
           type: "scatter",
           name: "Pallet",
           data: scatterData,
+          // Boost: 1000+ nokta için WebGL hızlandırma
+          boostThreshold: 1000,
         },
       ],
     };
   }, [series, height]);
 
   return (
-    <HighchartsReact
-      highcharts={Highcharts}
-      options={options}
-    />
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <HighchartsReact
+        highcharts={Highcharts}
+        options={options}
+        ref={chartRef}
+      />
+    </div>
   );
 }
+
+
+

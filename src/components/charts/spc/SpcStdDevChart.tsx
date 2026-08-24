@@ -1,33 +1,26 @@
 ﻿"use client";
 // =============================================================================
 // src/components/charts/spc/SpcStdDevChart.tsx
-// SPC GÃ¶rÃ¼nÃ¼m Modu â€” Standart Sapma + Cp + Cpk GrafiÄŸi
+// SPC — Standart Sapma + Cp + Cpk Grafiği
 //
-// Vue'daki StandardDeviationChart.vue'nun karÅŸÄ±lÄ±ÄŸÄ±.
+// Vue karşılığı: StandardDeviationChart.vue
 //
-// Grafik YapÄ±sÄ±:
-//   X ekseni: Grup index (G1, G2, G3...)
-//   Birincil Y Ekseni (sol): Standart Sapma deÄŸerleri
-//   Ä°kincil Y Ekseni (saÄŸ): Cp ve Cpk deÄŸerleri
+// Özellikler:
+//   - useChartReflow: ResizeObserver ile otomatik reflow
+//   - boostThreshold: 1000+ grup için WebGL hızlandırma
+//   - İki Y ekseni: sol (sigma), sağ (Cp/Cpk)
+//   - 3 seri: Standard Deviation (mavi), Cp (yeşil), Cpk (sarı)
 //
-// 3 Seri:
-//   1. Standard Deviation (mavi) â€” her grubun sigma deÄŸeri
-//   2. Cp (yeÅŸil) â€” sÃ¼reÃ§ yeterliliÄŸi
-//   3. Cpk (sarÄ±) â€” merkezli sÃ¼reÃ§ yeterliliÄŸi
-//
-// Cp ve Cpk FormÃ¼lleri:
-//   Cp  = (UCL - LCL) / (6 Ã— sigma)
-//        â†’ SÃ¼reÃ§ tolerans bandÄ±na sÄ±ÄŸÄ±yor mu?
-//        â†’ 1.33 Ã¼zeri â†’ yeterli, 1.67 Ã¼zeri â†’ mÃ¼kemmel
-//   Cpk = min((UCL - mean) / (3 Ã— sigma), (mean - LCL) / (3 Ã— sigma))
-//        â†’ SÃ¼reÃ§ hem toleransa sÄ±ÄŸÄ±yor hem de ortalanmÄ±ÅŸ mÄ±?
-//        â†’ Cpk < Cp ise sÃ¼reÃ§ merkezi kaymÄ±ÅŸ demektir.
+// Cp ve Cpk Formülleri:
+//   Cp  = (UCL - LCL) / (6 * sigma)
+//   Cpk = min((UCL - mean) / (3 * sigma), (mean - LCL) / (3 * sigma))
 // =============================================================================
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import type { SpcSeries } from "@/types/spc";
+import { useChartReflow } from "@/hooks/useChartReflow";
 
 interface SpcStdDevChartProps {
   series: SpcSeries;
@@ -35,11 +28,14 @@ interface SpcStdDevChartProps {
 }
 
 export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
+  const chartRef = useRef<HighchartsReact.RefObject>(null);
+  const containerRef = useChartReflow<HTMLDivElement>(chartRef);
+
   const options = useMemo((): Highcharts.Options => {
     const categories = series.groups.map((g) => `G${g.groupIndex}`);
-    const tolerance = series.ucl - series.lcl; // Toplam tolerans bandÄ±
+    const tolerance = series.ucl - series.lcl; // Toplam tolerans bandı
 
-    // Her grup iÃ§in Cp ve Cpk hesaplanÄ±r
+    // Her grup için Cp ve Cpk hesaplanır
     const sigmaData: number[] = [];
     const cpData:    number[] = [];
     const cpkData:   number[] = [];
@@ -48,7 +44,6 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       sigmaData.push(g.sigma);
 
       if (g.sigma === 0) {
-        // Sigma 0 ise (tÃ¼m Ã¶lÃ§Ã¼mler eÅŸit) tanÄ±msÄ±z â†’ maksimum deÄŸer koy
         cpData.push(Infinity);
         cpkData.push(Infinity);
         return;
@@ -63,12 +58,6 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       cpData.push(parseFloat(cp.toFixed(4)));
       cpkData.push(parseFloat(cpk.toFixed(4)));
     });
-
-    // Cp/Cpk'nÄ±n ortalama deÄŸerlerini badge iÃ§in hesapla
-    const validCp  = cpData.filter(isFinite);
-    const validCpk = cpkData.filter(isFinite);
-    const avgCp    = validCp.length  ? validCp.reduce((a, b)  => a + b, 0) / validCp.length  : 0;
-    const avgCpk   = validCpk.length ? validCpk.reduce((a, b) => a + b, 0) / validCpk.length : 0;
 
     return {
       chart: {
@@ -88,19 +77,16 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // â”€â”€ Ä°ki Y Ekseni: sol (sigma) + saÄŸ (Cp/Cpk) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      // Highcharts'ta birden fazla Y ekseni tanÄ±mlanabilir.
-      // Her seri "yAxis: 0" veya "yAxis: 1" ile hangi eksene baÄŸlandÄ±ÄŸÄ±nÄ± belirtir.
+      // ═══ İki Y Ekseni ═════════════════════════════════════════════════════
       yAxis: [
-        // Birincil Y ekseni (sol) â€” Sigma deÄŸerleri
+        // Birincil Y ekseni (sol) — Sigma değerleri
         {
           title: {
-            text: "Ïƒ Std Dev",
+            text: "σ Std Dev",
             style: { color: "#3b82f6", fontSize: "10px" },
           },
           gridLineColor: "#21262d",
           labels: { style: { color: "#3b82f6", fontSize: "10px" } },
-          // Referans Ã§izgisi: sigma'nÄ±n beklenen Ã¼st sÄ±nÄ±rÄ±
           plotLines: [
             {
               value: series.mean > 0 ? (series.ucl - series.lcl) / 6 : 0,
@@ -109,22 +95,21 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
               dashStyle: "Dash",
               zIndex: 4,
               label: {
-                text: "Expected Ïƒ",
+                text: "Expected σ",
                 style: { color: "#60a5fa", fontSize: "9px" },
               },
             },
           ],
         },
-        // Ä°kincil Y ekseni (saÄŸ) â€” Cp ve Cpk deÄŸerleri
+        // İkincil Y ekseni (sağ) — Cp ve Cpk değerleri
         {
           title: {
             text: "Cp / Cpk",
             style: { color: "#4ade80", fontSize: "10px" },
           },
-          opposite: true,         // SaÄŸ tarafa yerleÅŸtirir
-          gridLineWidth: 0,       // Ä°kinci eksen grid Ã§izgisi gÃ¶sterme
+          opposite: true,
+          gridLineWidth: 0,
           labels: { style: { color: "#8b949e", fontSize: "10px" } },
-          // Cp â‰¥ 1.33 = yeterli sÄ±nÄ±r â€” kÄ±lavuz Ã§izgisi
           plotLines: [
             {
               value: 1.33,
@@ -146,9 +131,9 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "11px" },
-        shared: true,             // Birden fazla seri â€” tek tooltip'te gÃ¶ster
+        shared: true,
         formatter: function (this: any) {
-          const i = (this.points?.[0]?.point.index ?? 0);
+          const i = (this.points?.[0]?.point?.index ?? 0);
           const g = series.groups[i];
           const cp  = cpData[i];
           const cpk = cpkData[i];
@@ -157,9 +142,9 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
 
           return (
             `<b>Group ${g.groupIndex}</b><br/>` +
-            `Ïƒ: <b>${g.sigma.toFixed(4)}</b><br/>` +
-            `Cp: <b style="color:${cpColor}">${isFinite(cp) ? cp.toFixed(3) : "âˆ"}</b><br/>` +
-            `Cpk: <b style="color:${cpkColor}">${isFinite(cpk) ? cpk.toFixed(3) : "âˆ"}</b>`
+            `σ: <b>${g.sigma.toFixed(4)}</b><br/>` +
+            `Cp: <b style="color:${cpColor}">${isFinite(cp) ? cp.toFixed(3) : "∞"}</b><br/>` +
+            `Cpk: <b style="color:${cpkColor}">${isFinite(cpk) ? cpk.toFixed(3) : "∞"}</b>`
           );
         },
       },
@@ -178,26 +163,27 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       },
 
       series: [
-        // Standart Sapma â€” Sol Y ekseni, mavi
+        // Standart Sapma — Sol Y ekseni, mavi
         {
           type: "line",
-          name: "Std Dev (Ïƒ)",
-          yAxis: 0,             // Birincil (sol) eksene baÄŸlÄ±
+          name: "Std Dev (σ)",
+          yAxis: 0,
           color: "#3b82f6",
           data: sigmaData,
           zIndex: 3,
+          boostThreshold: 1000,
         },
-        // Cp â€” SaÄŸ Y ekseni, yeÅŸil
+        // Cp — Sağ Y ekseni, yeşil
         {
           type: "line",
           name: "Cp",
-          yAxis: 1,             // Ä°kincil (saÄŸ) eksene baÄŸlÄ±
+          yAxis: 1,
           color: "#4ade80",
           dashStyle: "ShortDash",
           data: cpData.map((v) => (isFinite(v) ? v : null)),
           zIndex: 2,
         },
-        // Cpk â€” SaÄŸ Y ekseni, sarÄ±
+        // Cpk — Sağ Y ekseni, sarı
         {
           type: "line",
           name: "Cpk",
@@ -212,11 +198,16 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
   }, [series, height]);
 
   return (
-    <HighchartsReact
-      highcharts={Highcharts}
-      options={options}
-    />
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <HighchartsReact
+        highcharts={Highcharts}
+        options={options}
+        ref={chartRef}
+      />
+    </div>
   );
 }
+
+
 
 

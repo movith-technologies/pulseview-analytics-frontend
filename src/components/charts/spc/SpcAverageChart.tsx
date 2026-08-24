@@ -1,34 +1,32 @@
 ﻿"use client";
 // =============================================================================
 // src/components/charts/spc/SpcAverageChart.tsx
-// SPC GÃ¶rÃ¼nÃ¼m Modu â€” X-Bar Ortalama GrafiÄŸi
+// SPC — X-Bar Ortalama Grafiği
 //
-// Bu grafik SPC'nin temel gÃ¶rÃ¼nÃ¼mÃ¼dÃ¼r. Vue'daki AverageChart.vue'nun karÅŸÄ±lÄ±ÄŸÄ±.
+// Vue karşılığı: AverageChart.vue
 //
-// Grafik YapÄ±sÄ±:
-//   X ekseni: Grup index (1, 2, 3... â€” her nokta 200 Ã¶lÃ§Ã¼mÃ¼n ortalamasÄ±)
-//   Y ekseni:
-//     plotBands (renkli alanlar):
-//       - SARI geniÅŸ bant: monitoringMin â†” monitoringMax
-//       - YEÅÄ°L dar bant:  lcl â†” ucl
-//     plotLines (referans Ã§izgileri):
-//       - monitoringMax: sarÄ± Ã§izgi (Ã¼st izleme limiti)
-//       - ucl:           yeÅŸil Ã§izgi (kontrol Ã¼st limiti)
-//       - mean:          kÄ±rmÄ±zÄ± kesikli (genel ortalama)
-//       - lcl:           yeÅŸil Ã§izgi (kontrol alt limiti)
-//       - monitoringMin: sarÄ± Ã§izgi (alt izleme limiti)
-//   Seri: grup ortalama deÄŸerleri (x-bar) â€” mavi Ã§izgi
-//
-// plotBands vs plotLines:
-//   plotBands = dolgulu renkli alan (from â†’ to arasÄ±ndaki bÃ¶lge)
-//   plotLines = tek bir deÄŸerde yatay Ã§izgi
-//   Ä°kisi birlikte kullanÄ±lÄ±r: bant arka plan, Ã§izgi sÄ±nÄ±rÄ± vurgular.
+// Özellikler:
+//   - useChartReflow: ResizeObserver ile otomatik reflow
+//   - boostThreshold: 1000+ grup için WebGL hızlandırma
+//   - Y ekseni:
+//       plotBands (renkli alanlar):
+//         - SARI geniş bant: monitoringMin – monitoringMax
+//         - YEŞİL dar bant:  lcl – ucl
+//       plotLines (referans çizgileri):
+//         - monitoringMax: sarı çizgi (üst izleme limiti)
+//         - ucl:           yeşil çizgi (kontrol üst limiti)
+//         - mean:          kırmızı kesikli (genel ortalama)
+//         - lcl:           yeşil çizgi (kontrol alt limiti)
+//         - monitoringMin: sarı çizgi (alt izleme limiti)
+//   - Seri: grup ortalama değerleri (x-bar) — mavi çizgi
+//   - Out-of-control noktaları kırmızı işaretlenir
 // =============================================================================
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import type { SpcSeries } from "@/types/spc";
+import { useChartReflow } from "@/hooks/useChartReflow";
 
 interface SpcAverageChartProps {
   series: SpcSeries;
@@ -36,6 +34,9 @@ interface SpcAverageChartProps {
 }
 
 export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) {
+  const chartRef = useRef<HighchartsReact.RefObject>(null);
+  const containerRef = useChartReflow<HTMLDivElement>(chartRef);
+
   const options = useMemo((): Highcharts.Options => {
     const avgData = series.groups.map((g) => g.avg);
     const categories = series.groups.map((g) => `G${g.groupIndex}`);
@@ -51,7 +52,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
       title:   { text: undefined },
       credits: { enabled: false },
 
-      // â”€â”€ X Ekseni: Grup Kategorileri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ X Ekseni: Grup Kategorileri ════════════════════════════════════
       xAxis: {
         categories,
         lineColor: "#30363d",
@@ -60,40 +61,35 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // â”€â”€ Y Ekseni: DeÄŸerler + plotBands + plotLines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Y Ekseni: Değerler + plotBands + plotLines ══════════════════════
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
         title: { text: undefined },
 
-        // â”€â”€ plotBands: Renkli dolgulu alanlar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // Bu yapÄ±, Highcharts'ta Y eksenine paralel dolgu alanlarÄ±dÄ±r.
-        // "from" ve "to" deÄŸerleri Y eksenindeki koordinatlarÄ± belirtir.
-        // zIndex: bandÄ±n grafik elemanlarÄ±na gÃ¶re sÄ±rasÄ± (dÃ¼ÅŸÃ¼k = arkada)
+        // ─── plotBands: Renkli dolgulu alanlar ──────────────────────────────
+        // "from" ve "to" değerleri Y eksenindeki koordinatları belirtir.
+        // zIndex: bandın grafik elemanlarına göre sırası (düşük = arkada)
         plotBands: [
-          // SARI geniÅŸ bant: monitoringMin â†” monitoringMax
-          // TÃ¼m izleme aralÄ±ÄŸÄ±nÄ± gÃ¶sterir â€” arkada, soluk sarÄ±
+          // SARI geniş bant: monitoringMin – monitoringMax
           {
             from: series.monitoringMin,
             to:   series.monitoringMax,
-            color: "rgba(234, 179, 8, 0.08)",    // soluk sarÄ±
+            color: "rgba(234, 179, 8, 0.08)",    // soluk sarı
             zIndex: 1,
           },
-          // YEÅÄ°L dar bant: lcl â†” ucl
-          // Kontrol sÄ±nÄ±rlarÄ±nÄ± gÃ¶sterir â€” sarÄ± bandÄ±n Ã¶nÃ¼nde, soluk yeÅŸil
+          // YEŞİL dar bant: lcl – ucl
           {
             from: series.lcl,
             to:   series.ucl,
-            color: "rgba(34, 197, 94, 0.12)",    // soluk yeÅŸil
+            color: "rgba(34, 197, 94, 0.12)",    // soluk yeşil
             zIndex: 2,
           },
         ],
 
-        // â”€â”€ plotLines: Referans sÄ±nÄ±r Ã§izgileri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // Her limit iÃ§in ayrÄ± bir yatay Ã§izgi.
-        // Bant sÄ±nÄ±rlarÄ±nÄ± (from/to) gÃ¶rsel olarak Ã§izgiyle vurgular.
+        // ─── plotLines: Referans sınır çizgileri ────────────────────────────
         plotLines: [
-          // Monitoring Max â€” SarÄ± Ã¼st izleme limiti
+          // Monitoring Max → Sarı üst izleme limiti
           {
             value: series.monitoringMax,
             color: "#eab308",
@@ -106,7 +102,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
               style: { color: "#eab308", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // UCL â€” YeÅŸil kontrol Ã¼st limiti
+          // UCL → Yeşil kontrol üst limiti
           {
             value: series.ucl,
             color: "#22c55e",
@@ -119,7 +115,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
               style: { color: "#22c55e", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // Mean â€” KÄ±rmÄ±zÄ± kesikli genel ortalama
+          // Mean → Kırmızı kesikli genel ortalama
           {
             value: series.mean,
             color: "#ef4444",
@@ -132,7 +128,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
               style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // LCL â€” YeÅŸil kontrol alt limiti
+          // LCL → Yeşil kontrol alt limiti
           {
             value: series.lcl,
             color: "#22c55e",
@@ -146,7 +142,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
               style: { color: "#22c55e", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // Monitoring Min â€” SarÄ± alt izleme limiti
+          // Monitoring Min → Sarı alt izleme limiti
           {
             value: series.monitoringMin,
             color: "#eab308",
@@ -167,12 +163,13 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        formatter: function (this: any) {
+        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        function (this: any) {
           const g = series.groups[this.point.index];
           const status =
             g.avg > series.ucl || g.avg < series.lcl
-              ? `<span style="color:#ef4444">âš  Out of Control</span>`
-              : `<span style="color:#22c55e">âœ“ In Control</span>`;
+              ? `<span style="color:#ef4444">✗ Out of Control</span>`
+              : `<span style="color:#22c55e">✓ In Control</span>`;
           return (
             `<b>Group ${g.groupIndex}</b><br/>` +
             `Average: <b>${g.avg.toFixed(4)}</b><br/>` +
@@ -191,7 +188,6 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             enabled: true,
             radius: 4,
             symbol: "circle",
-            // Out-of-control noktalarÄ± kÄ±rmÄ±zÄ± gÃ¶ster
             states: { hover: { radius: 6 } },
           },
         },
@@ -203,9 +199,10 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
           name: "X-Bar (Average)",
           color: "#3b82f6",
           zIndex: 3,
-          data: avgData.map((avg, i) => ({
+          boostThreshold: 1000,
+          data: avgData.map((avg) => ({
             y: avg,
-            // UCL veya LCL dÄ±ÅŸÄ±na Ã§Ä±kan noktalar kÄ±rmÄ±zÄ± iÅŸaretlenir
+            // Out-of-control noktaları kırmızı işaretlenir
             marker: {
               fillColor:
                 avg > series.ucl || avg < series.lcl ? "#ef4444" : undefined,
@@ -219,10 +216,13 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
   }, [series, height]);
 
   return (
-    <HighchartsReact
-      highcharts={Highcharts}
-      options={options}
-    />
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <HighchartsReact
+        highcharts={Highcharts}
+        options={options}
+        ref={chartRef}
+      />
+    </div>
   );
 }
 

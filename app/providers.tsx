@@ -1,34 +1,31 @@
-"use client";
+﻿"use client";
 // =============================================================================
 // app/providers.tsx
-// TanStack Query Client Provider
-//
-// Next.js App Router'da tüm Provider'lar "use client" direktifine sahip
-// bir wrapper bileşende tanımlanır ve layout.tsx içinde kullanılır.
-// Bu sayede Server Component'lerin avantajları korunur.
+// TanStack Query Client Provider + Highcharts Global Init
 // =============================================================================
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { initHighcharts } from "@/lib/highchartsInit";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // QueryClient her render'da yeni oluşmasın diye useState içinde tutuyoruz.
-  // Singleton pattern — uygulama boyunca tek bir cache paylaşılır.
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Sayfa yeniden odaklandığında otomatik refetch (production için faydalı)
             refetchOnWindowFocus: false,
-            // Hata durumunda otomatik tekrar denemeler
             retry: 1,
-            // Standart stale time (her sorgu kendi değerini override edebilir)
             staleTime: 0,
           },
         },
       })
   );
+
+  // Highcharts Boost modülünü istemci tarafında bir kez başlat
+  useEffect(() => {
+    void initHighcharts();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

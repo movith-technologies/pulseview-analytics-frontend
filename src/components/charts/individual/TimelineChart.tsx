@@ -1,26 +1,24 @@
 ﻿"use client";
 // =============================================================================
 // src/components/charts/individual/TimelineChart.tsx
-// Individual Values â€” Zaman Serisi Ã‡izgi GrafiÄŸi
+// Individual Values — Zaman Serisi Grafiği (Timeline / Control Chart)
 //
-// Highcharts'ta Next.js App Router entegrasyonunun kritik noktasÄ±:
-//   1. "use client" direktifi ZORUNLU â€” Highcharts window.document kullanÄ±r.
-//   2. HighchartsReact bileÅŸeni otomatik olarak ref yÃ¶netimi yapar.
-//   3. SSR sÄ±rasÄ±nda Highcharts import'u yapÄ±lmaz (sunucu tarafÄ± sorunu yok).
+// Vue karşılığı: ControlChart.vue
+// Veri akışı: IndividualValueSeries → Highcharts line (Stock chart)
 //
-// Grafik YapÄ±sÄ±:
-//   X ekseni: datetime â€” ISO tarih stringleri Unix timestamp'e Ã§evrilir
-//   Y ekseni: ham Ã¶lÃ§Ã¼m deÄŸerleri + 3 referans Ã§izgisi (plotLines)
-//     - monitoringMax: KÄ±rmÄ±zÄ±, monitoring Ã¼st limiti
-//     - mean:          Turuncu kesikli, ortalama
-//     - monitoringMin: Siyah, monitoring alt limiti
-//   Seri: turboThreshold: 30000 â€” bÃ¼yÃ¼k veri optimizasyonu
+// Özellikler:
+//   - useChartReflow: ResizeObserver ile otomatik reflow
+//   - turboThreshold: 30000 → büyük veri optimizasyonu
+//   - Boost modülü (providers.tsx'te başlatılır): 30k+ nokta için WebGL
+//   - plotLines: UCL, LCL, Mean, monitoringMax, monitoringMin referans çizgileri
+//   - Zoom: X ekseninde fare ile yakınlaştırma (zooming.type: "x")
 // =============================================================================
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import type { IndividualValueSeries } from "@/types/spc";
+import { useChartReflow } from "@/hooks/useChartReflow";
 
 interface TimelineChartProps {
   series: IndividualValueSeries;
@@ -28,34 +26,46 @@ interface TimelineChartProps {
 }
 
 export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
-  // useMemo: veri deÄŸiÅŸmedikÃ§e grafik seÃ§enekleri yeniden hesaplanmaz.
-  // Bu, React'in her render dÃ¶ngÃ¼sÃ¼nde gereksiz yeniden Ã§izimi Ã¶nler.
+  // Highcharts chart instance'ına erişim için ref
+  const chartRef = useRef<HighchartsReact.RefObject>(null);
+  // ResizeObserver ile otomatik reflow — container boyutu değiştiğinde tetiklenir
+  const containerRef = useChartReflow<HTMLDivElement>(chartRef);
+
+  // useMemo: veri değişmedikçe grafik seçenekleri yeniden hesaplanmaz.
+  // Bu, React'in her render döngüsünde gereksiz yeniden çizimi önler.
   const options = useMemo((): Highcharts.Options => {
-    // ISO string â†’ Unix timestamp dÃ¶nÃ¼ÅŸÃ¼mÃ¼.
-    // Highcharts datetime ekseni iÃ§in milisaniye cinsinden deÄŸer bekler.
+    // ISO string → Unix timestamp dönüşümü.
+    // Highcharts datetime ekseni için milisaniye cinsinden değer bekler.
     const chartData = series.dataPoints.map((p) => [
       new Date(p.date).getTime(),
       p.value,
     ]);
 
     return {
-      // â”€â”€ Genel Ayarlar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Genel Ayarlar ════════════════════════════════════════════════════
       chart: {
         type: "line",
         height,
-        backgroundColor: "transparent",  // Kart arka planÄ± kullanÄ±lÄ±r
+        backgroundColor: "transparent",
         animation: { duration: 400 },
-        zooming: { type: "x" },           // X ekseninde yakÄ±nlaÅŸtÄ±rma
+        zooming: { type: "x" },
         style: { fontFamily: "var(--font-inter, Inter, sans-serif)" },
+        // reflow() için panelin her boyutlandırılmasında çalışır
+        events: {
+          load() {
+            // İlk yüklemede container boyutuna sığdır
+            this.reflow();
+          },
+        },
       },
-      title:    { text: undefined },       // BaÅŸlÄ±k ChartCard'dan gelir
-      credits:  { enabled: false },        // "Highcharts.com" yazÄ±sÄ±nÄ± gizle
-      // â”€â”€ KaydÄ±rma Ã§ubuÄŸu ve gezgin devre dÄ±ÅŸÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      title:    { text: undefined },       // Başlık ChartCard'dan gelir
+      credits:  { enabled: false },        // "Highcharts.com" yazısını gizle
+      // ═══ Kaydırma Çubuğu ve Gezgin Devre Dışı ════════════════════════════
       scrollbar: { enabled: false },
       navigator: { enabled: false },
       rangeSelector: { enabled: false },
 
-      // â”€â”€ X Ekseni: Zaman â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ X Ekseni: Zaman ══════════════════════════════════════════════════
       xAxis: {
         type: "datetime",
         lineColor: "#30363d",
@@ -67,16 +77,14 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
         crosshair: { color: "rgba(255,255,255,0.1)", width: 1 },
       },
 
-      // â”€â”€ Y Ekseni: Ã–lÃ§Ã¼m DeÄŸerleri + Referans Ã‡izgileri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Y Ekseni: Ölçüm Değerleri + Referans Çizgileri ═════════════════
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
         title: { text: undefined },
-        // â”€â”€ plotLines: Referans sÄ±nÄ±r Ã§izgileri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // plotLines, grafik Ã¼zerine yatay (veya dikey) sabit Ã§izgi Ã§izer.
-        // Her Ã§izginin "value" alanÄ± Y eksenindeki konumunu belirler.
+        // ─── plotLines: Referans sınır çizgileri ──────────────────────────
         plotLines: [
-          // Monitoring Max â€” KÄ±rmÄ±zÄ± Ã¼st limit
+          // Monitoring Max → Kırmızı üst limit
           {
             value: series.monitoringMax,
             color: "#ef4444",
@@ -89,7 +97,7 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
               style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // UCL â€” YeÅŸil kontrol Ã¼st limiti (daha ince)
+          // UCL → Yeşil kontrol üst limiti (daha ince)
           {
             value: series.ucl,
             color: "#22c55e",
@@ -102,7 +110,7 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
               style: { color: "#22c55e", fontSize: "9px" },
             },
           },
-          // Mean â€” Turuncu kesikli ortalama Ã§izgisi
+          // Mean → Turuncu kesikli ortalama çizgisi
           {
             value: series.mean,
             color: "#f97316",
@@ -115,7 +123,7 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
               style: { color: "#f97316", fontSize: "9px", fontWeight: "600" },
             },
           },
-          // LCL â€” YeÅŸil kontrol alt limiti
+          // LCL → Yeşil kontrol alt limiti
           {
             value: series.lcl,
             color: "#22c55e",
@@ -129,7 +137,7 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
               style: { color: "#22c55e", fontSize: "9px" },
             },
           },
-          // Monitoring Min â€” Siyah alt limit
+          // Monitoring Min → Alt limit
           {
             value: series.monitoringMin,
             color: "#1f2937",
@@ -146,56 +154,64 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
         ],
       },
 
-      // â”€â”€ Tooltip: Fare Ã¼zerine gelince bilgi kutusu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Tooltip: Fare üzerine gelince bilgi kutusu ═══════════════════════
       tooltip: {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
         xDateFormat: "%Y-%m-%d %H:%M:%S",
-        formatter: function (this: any) {
+        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        function (this: any) {
           const date = new Date(this.x as number).toLocaleString("tr-TR");
           return `<b>${date}</b><br/>Value: <b>${(this.y as number).toFixed(4)}</b>`;
         },
       },
 
-      // â”€â”€ GÃ¶sterge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Gösterge ════════════════════════════════════════════════════════
       legend: { enabled: false },
 
-      // â”€â”€ Seri SeÃ§enekleri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Seri Seçenekleri ════════════════════════════════════════════════
       plotOptions: {
         line: {
           lineWidth: 1.5,
-          animation: false,   // BÃ¼yÃ¼k veri setleri iÃ§in animasyon kapatÄ±ldÄ±
+          animation: false,   // Büyük veri setleri için animasyon kapatıldı
           marker: {
-            enabled: chartData.length < 200,  // Az veri â†’ nokta gÃ¶ster
+            enabled: chartData.length < 200,  // Az veri → nokta göster
             radius: 3,
           },
           states: { hover: { lineWidth: 2 } },
         },
       },
 
-      // â”€â”€ Veri Serisi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ═══ Veri Serisi ══════════════════════════════════════════════════════
       series: [
         {
           type: "line",
           name: series.measurementName,
-          // turboThreshold: Highcharts varsayÄ±lan olarak 1000 Ã¼zeri veriyi
-          // otomatik basitleÅŸtirir. 30000'e Ã§Ä±kararak bunu engelliyoruz.
+          // turboThreshold: Highcharts varsayılan olarak 1000 üzeri veriyi
+          // otomatik basitleştirir. 30000'e çıkararak bunu engelliyoruz.
+          // Boost modülü (WebGL) bu eşiğin üzerindeki veriyi GPU'da işler.
           turboThreshold: 30000,
           color: "#3b82f6",
           data: chartData,
           zIndex: 2,
+          // Boost: 1000+ nokta için WebGL hızlandırma
+          // (providers.tsx'te initHighcharts() ile aktifleştirilir)
+          boostThreshold: 1000,
         },
       ],
     };
   }, [series, height]);
 
   return (
-    <HighchartsReact
-      highcharts={Highcharts}
-      options={options}
-      immutable={false}
-    />
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <HighchartsReact
+        highcharts={Highcharts}
+        options={options}
+        ref={chartRef}
+        immutable={false}
+      />
+    </div>
   );
 }
 
