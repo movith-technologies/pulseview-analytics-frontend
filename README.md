@@ -134,10 +134,3 @@ Proje varsayılan olarak dahili `/api/*` Next.js Route Handlers mock motorunu ku
    NEXT_PUBLIC_API_URL=https://api.pulseview.example.com
    ```
 2. [`src/lib/api/spcClient.ts`](src/lib/api/spcClient.ts) dosyasında `BASE_URL` otomatik olarak bu adrese yönlendirilir.
-
----
-
-## 📜 Lisans & Geliştirici
-
-Bu proje [Movith Technologies](https://github.com/movith-technologies) tarafından geliştirilmektedir.
-Tüm hakları saklıdır.
