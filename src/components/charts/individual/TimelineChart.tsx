@@ -1,17 +1,20 @@
 ﻿"use client";
 // =============================================================================
 // src/components/charts/individual/TimelineChart.tsx
-// Individual Values — Zaman Serisi Grafiği (Timeline / Control Chart)
+// Individual Values — Değerler Grafiği (Control Chart)
 //
 // Vue karşılığı: ControlChart.vue
-// Veri akışı: IndividualValueSeries → Highcharts line (Stock chart)
+//
+// SSL Dokümanı (Section 2.2.1) uyumu:
+//   - X ekseni: DATETIME — zaman serisi (14:00, 00:00...) gösterir
+//   - Y ekseni solunda: Max, Mean, Min etiketleri (SOL hizalı)
+//   - Sadece 3 ana referans çizgisi: Max (monitoring), Mean, Min (monitoring)
+//   - UCL/LCL de ek çizgi olarak eklenir (yeşil kesikli)
 //
 // Özellikler:
 //   - useChartReflow: ResizeObserver ile otomatik reflow
-//   - turboThreshold: 30000 → büyük veri optimizasyonu
-//   - Boost modülü (providers.tsx'te başlatılır): 30k+ nokta için WebGL
-//   - plotLines: UCL, LCL, Mean, monitoringMax, monitoringMin referans çizgileri
-//   - Zoom: X ekseninde fare ile yakınlaştırma (zooming.type: "x")
+//   - turboThreshold: 30000 + boostThreshold: 1000
+//   - Zoom: X ekseninde fare ile yakınlaştırma
 // =============================================================================
 
 import { useMemo, useRef } from "react";
@@ -26,23 +29,18 @@ interface TimelineChartProps {
 }
 
 export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
-  // Highcharts chart instance'ına erişim için ref
   const chartRef = useRef<HighchartsReact.RefObject>(null);
-  // ResizeObserver ile otomatik reflow — container boyutu değiştiğinde tetiklenir
   const containerRef = useChartReflow<HTMLDivElement>(chartRef);
 
-  // useMemo: veri değişmedikçe grafik seçenekleri yeniden hesaplanmaz.
-  // Bu, React'in her render döngüsünde gereksiz yeniden çizimi önler.
   const options = useMemo((): Highcharts.Options => {
-    // ISO string → Unix timestamp dönüşümü.
-    // Highcharts datetime ekseni için milisaniye cinsinden değer bekler.
-    const chartData = series.dataPoints.map((p) => [
+    // X: timestamp (ms), Y: ölçüm değeri — SSL dokümanı datetime X ekseni gösteriyor
+    const chartData: [number, number][] = series.dataPoints.map((p) => [
       new Date(p.date).getTime(),
       p.value,
     ]);
 
     return {
-      // ═══ Genel Ayarlar ════════════════════════════════════════════════════
+      // ═══ Genel Ayarlar ═══════════════════════════════════════════════════
       chart: {
         type: "line",
         height,
@@ -50,22 +48,18 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
         animation: { duration: 400 },
         zooming: { type: "x" },
         style: { fontFamily: "var(--font-inter, Inter, sans-serif)" },
-        // reflow() için panelin her boyutlandırılmasında çalışır
         events: {
-          load() {
-            // İlk yüklemede container boyutuna sığdır
-            this.reflow();
-          },
+          load() { this.reflow(); },
         },
       },
-      title:    { text: undefined },       // Başlık ChartCard'dan gelir
-      credits:  { enabled: false },        // "Highcharts.com" yazısını gizle
-      // ═══ Kaydırma Çubuğu ve Gezgin Devre Dışı ════════════════════════════
-      scrollbar: { enabled: false },
-      navigator: { enabled: false },
+      title:      { text: undefined },
+      credits:    { enabled: false },
+      scrollbar:  { enabled: false },
+      navigator:  { enabled: false },
       rangeSelector: { enabled: false },
 
-      // ═══ X Ekseni: Zaman ══════════════════════════════════════════════════
+      // ═══ X Ekseni: Datetime ════════════════════════════════════════════════
+      // SSL dokümanında X ekseninde "14:00, 00:00, 14:00, 07:00" gibi saatler var
       xAxis: {
         type: "datetime",
         lineColor: "#30363d",
@@ -77,14 +71,14 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
         crosshair: { color: "rgba(255,255,255,0.1)", width: 1 },
       },
 
-      // ═══ Y Ekseni: Ölçüm Değerleri + Referans Çizgileri ═════════════════
+      // ═══ Y Ekseni: Sol tarafta etiketli referans çizgileri ════════════════
+      // SSL dokümanı: Max, Mean, Min etiketleri SOL tarafta (align: "left")
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
         title: { text: undefined },
-        // ─── plotLines: Referans sınır çizgileri ──────────────────────────
         plotLines: [
-          // Monitoring Max → Kırmızı üst limit
+          // Max → Kırmızı üst monitoring limiti (SOL etiket)
           {
             value: series.monitoringMax,
             color: "#ef4444",
@@ -92,12 +86,13 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
             dashStyle: "Solid",
             zIndex: 4,
             label: {
-              text: `Max ${series.monitoringMax.toFixed(2)}`,
-              align: "right",
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: `Max`,
+              align: "left",
+              x: 5,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // UCL → Yeşil kontrol üst limiti (daha ince)
+          // UCL → Yeşil kontrol üst limiti (kesikli, sol etiket)
           {
             value: series.ucl,
             color: "#22c55e",
@@ -105,12 +100,13 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
             dashStyle: "ShortDash",
             zIndex: 3,
             label: {
-              text: `UCL ${series.ucl.toFixed(2)}`,
-              align: "right",
+              text: `UCL`,
+              align: "left",
+              x: 5,
               style: { color: "#22c55e", fontSize: "9px" },
             },
           },
-          // Mean → Turuncu kesikli ortalama çizgisi
+          // Mean → Turuncu kesikli ortalama (SOL etiket)
           {
             value: series.mean,
             color: "#f97316",
@@ -118,12 +114,13 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
             dashStyle: "Dash",
             zIndex: 4,
             label: {
-              text: `Mean ${series.mean.toFixed(2)}`,
-              x: 40,
-              style: { color: "#f97316", fontSize: "9px", fontWeight: "600" },
+              text: `Mean`,
+              align: "left",
+              x: 5,
+              style: { color: "#f97316", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // LCL → Yeşil kontrol alt limiti
+          // LCL → Yeşil kontrol alt limiti (kesikli, sol etiket)
           {
             value: series.lcl,
             color: "#22c55e",
@@ -131,52 +128,54 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
             dashStyle: "ShortDash",
             zIndex: 3,
             label: {
-              text: `LCL ${series.lcl.toFixed(2)}`,
-              align: "right",
+              text: `LCL`,
+              align: "left",
+              x: 5,
               y: 12,
               style: { color: "#22c55e", fontSize: "9px" },
             },
           },
-          // Monitoring Min → Alt limit
+          // Min → Alt monitoring limiti (SOL etiket)
           {
             value: series.monitoringMin,
-            color: "#1f2937",
+            color: "#ef4444",
             width: 1.5,
             dashStyle: "Solid",
             zIndex: 4,
             label: {
-              text: `Min ${series.monitoringMin.toFixed(2)}`,
-              align: "right",
+              text: `Min`,
+              align: "left",
+              x: 5,
               y: 12,
-              style: { color: "#94a3b8", fontSize: "9px", fontWeight: "600" },
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
         ],
       },
 
-      // ═══ Tooltip: Fare üzerine gelince bilgi kutusu ═══════════════════════
+      // ═══ Tooltip ══════════════════════════════════════════════════════════
       tooltip: {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        xDateFormat: "%Y-%m-%d %H:%M:%S",
-        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        function (this: any) {
-          const date = new Date(this.x as number).toLocaleString("tr-TR");
-          return `<b>${date}</b><br/>Value: <b>${(this.y as number).toFixed(4)}</b>`;
+        formatter: function (this: any) {
+          const dateStr = Highcharts.dateFormat("%d.%m.%Y %H:%M:%S", this.x as number);
+          return (
+            `<b>${dateStr}</b><br/>` +
+            `Value: <b>${(this.y as number).toFixed(4)}</b>`
+          );
         },
       },
 
-      // ═══ Gösterge ════════════════════════════════════════════════════════
       legend: { enabled: false },
 
       // ═══ Seri Seçenekleri ════════════════════════════════════════════════
       plotOptions: {
         line: {
           lineWidth: 1.5,
-          animation: false,   // Büyük veri setleri için animasyon kapatıldı
+          animation: false,
           marker: {
-            enabled: chartData.length < 200,  // Az veri → nokta göster
+            enabled: chartData.length < 200,
             radius: 3,
           },
           states: { hover: { lineWidth: 2 } },
@@ -188,16 +187,11 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
         {
           type: "line",
           name: series.measurementName,
-          // turboThreshold: Highcharts varsayılan olarak 1000 üzeri veriyi
-          // otomatik basitleştirir. 30000'e çıkararak bunu engelliyoruz.
-          // Boost modülü (WebGL) bu eşiğin üzerindeki veriyi GPU'da işler.
           turboThreshold: 30000,
+          boostThreshold: 1000,
           color: "#3b82f6",
           data: chartData,
           zIndex: 2,
-          // Boost: 1000+ nokta için WebGL hızlandırma
-          // (providers.tsx'te initHighcharts() ile aktifleştirilir)
-          boostThreshold: 1000,
         },
       ],
     };
@@ -214,5 +208,3 @@ export function TimelineChart({ series, height = 300 }: TimelineChartProps) {
     </div>
   );
 }
-
-

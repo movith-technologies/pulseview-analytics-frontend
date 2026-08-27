@@ -4,12 +4,17 @@
 // SPC — Standart Sapma + Cp + Cpk Grafiği
 //
 // Vue karşılığı: StandardDeviationChart.vue
+// SSL Dokümanı (Section 2.2.2) uyumu:
+//   - Grafik başlığı: "{ölçümAdı} Standard Deviation" (SpcLayout'ta belirlenir)
+//   - BANT YOK — sadece kırmızı kesikli "Nominal Value" çizgisi
+//   - "Nominal Value" = expectedSigma (UCL-LCL)/6
+//   - Etiket SOL tarafta (align: "left")
+//   - Legend: Standard Deviation (mavi), Cp (yeşil), Cpk (sarı)
 //
 // Özellikler:
 //   - useChartReflow: ResizeObserver ile otomatik reflow
 //   - boostThreshold: 1000+ grup için WebGL hızlandırma
 //   - İki Y ekseni: sol (sigma), sağ (Cp/Cpk)
-//   - 3 seri: Standard Deviation (mavi), Cp (yeşil), Cpk (sarı)
 //
 // Cp ve Cpk Formülleri:
 //   Cp  = (UCL - LCL) / (6 * sigma)
@@ -33,7 +38,7 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
 
   const options = useMemo((): Highcharts.Options => {
     const categories = series.groups.map((g) => `G${g.groupIndex}`);
-    const tolerance = series.ucl - series.lcl; // Toplam tolerans bandı
+    const tolerance = series.ucl - series.lcl;
 
     // Her grup için Cp ve Cpk hesaplanır
     const sigmaData: number[] = [];
@@ -59,6 +64,9 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       cpkData.push(parseFloat(cpk.toFixed(4)));
     });
 
+    // Nominal Value sigma = (UCL - LCL) / 6  (beklenen/hedef sigma)
+    const nominalSigma = series.mean > 0 ? (series.ucl - series.lcl) / 6 : 0;
+
     return {
       chart: {
         height,
@@ -77,7 +85,7 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // ═══ İki Y Ekseni ═════════════════════════════════════════════════════
+      // ═══ İki Y Ekseni — BANT YOK, sadece Nominal Value çizgisi ═══════════
       yAxis: [
         // Birincil Y ekseni (sol) — Sigma değerleri
         {
@@ -87,16 +95,19 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
           },
           gridLineColor: "#21262d",
           labels: { style: { color: "#3b82f6", fontSize: "10px" } },
+          // SSL Dokümanı: kırmızı kesikli "Nominal Value" çizgisi, etiket sol
           plotLines: [
             {
-              value: series.mean > 0 ? (series.ucl - series.lcl) / 6 : 0,
-              color: "#60a5fa",
-              width: 1,
+              value: nominalSigma,
+              color: "#ef4444",
+              width: 1.5,
               dashStyle: "Dash",
               zIndex: 4,
               label: {
-                text: "Expected σ",
-                style: { color: "#60a5fa", fontSize: "9px" },
+                text: "Nominal Value",
+                align: "left",
+                x: 5,
+                style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
               },
             },
           ],
@@ -163,10 +174,10 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
       },
 
       series: [
-        // Standart Sapma — Sol Y ekseni, mavi
+        // Standard Deviation — Sol Y ekseni, mavi
         {
           type: "line",
-          name: "Std Dev (σ)",
+          name: "Standard Deviation",
           yAxis: 0,
           color: "#3b82f6",
           data: sigmaData,
@@ -178,7 +189,7 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
           type: "line",
           name: "Cp",
           yAxis: 1,
-          color: "#4ade80",
+          color: "#22c55e",
           dashStyle: "ShortDash",
           data: cpData.map((v) => (isFinite(v) ? v : null)),
           zIndex: 2,
@@ -207,7 +218,3 @@ export function SpcStdDevChart({ series, height = 300 }: SpcStdDevChartProps) {
     </div>
   );
 }
-
-
-
-

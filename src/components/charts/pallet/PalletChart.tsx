@@ -4,13 +4,14 @@
 // Pallet Analysis — X=Palet No, Y=Değer Scatter Plot
 //
 // Vue karşılığı: PalletScatterChart.vue
+// SSL Dokümanı (Section 2.2.3) uyumu:
+//   - PlotLine etiketleri SOL tarafta (align: "left", x: 5)
+//   - Etiketler: Max, Mean, Min
+//   - X ekseni: palet numarası (0 → maxPalletValue)
 //
 // Özellikler:
 //   - useChartReflow: ResizeObserver ile otomatik reflow
 //   - Boost modülü: WebGL ile 30k+ palet noktası
-//   - boostThreshold: 1000+ nokta için WebGL hızlandırma
-//   - X ekseni: Palet numarası (0 → maxPalletValue+1)
-//   - Y ekseni: Ölçüm değeri + kırmızı max/min çizgileri, turuncu mean
 // =============================================================================
 
 import { useMemo, useRef } from "react";
@@ -67,13 +68,13 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
         crosshair: { color: "rgba(255,255,255,0.08)", width: 1 },
       },
 
-      // ═══ Y Ekseni: Ölçüm Değeri + Referans Çizgileri ════════════════════
+      // ═══ Y Ekseni: Ölçüm Değeri + SOL Etiketli Referans Çizgileri ════════
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
         title: { text: undefined },
-
         plotLines: [
+          // Max → SOL etiket (SSL uyumu)
           {
             value: series.monitoringMax,
             color: "#ef4444",
@@ -81,11 +82,13 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
             dashStyle: "Solid",
             zIndex: 4,
             label: {
-              text: `Max ${series.monitoringMax.toFixed(2)}`,
-              align: "right",
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: "Max",
+              align: "left",
+              x: 5,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
+          // Mean → SOL etiket (SSL uyumu)
           {
             value: series.mean,
             color: "#f97316",
@@ -93,11 +96,13 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
             dashStyle: "Dash",
             zIndex: 4,
             label: {
-              text: `Mean ${series.mean.toFixed(2)}`,
-              x: 40,
-              style: { color: "#f97316", fontSize: "9px", fontWeight: "600" },
+              text: "Mean",
+              align: "left",
+              x: 5,
+              style: { color: "#f97316", fontSize: "9px", fontWeight: "700" },
             },
           },
+          // Min → SOL etiket (SSL uyumu)
           {
             value: series.monitoringMin,
             color: "#ef4444",
@@ -105,10 +110,11 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
             dashStyle: "Solid",
             zIndex: 4,
             label: {
-              text: `Min ${series.monitoringMin.toFixed(2)}`,
-              align: "right",
-              y: 15,
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: "Min",
+              align: "left",
+              x: 5,
+              y: 14,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
         ],
@@ -119,8 +125,7 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        function (this: any) {
+        formatter: function (this: any) {
           const custom = (this.point as any).custom;
           return (
             `<b>Value:</b> ${(this.y as number).toFixed(4)}<br/>` +
@@ -172,7 +177,6 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
           type: "scatter",
           name: "Pallet",
           data: scatterData,
-          // Boost: 1000+ nokta için WebGL hızlandırma
           boostThreshold: 1000,
         },
       ],
@@ -189,6 +193,3 @@ export function PalletChart({ series, height = 330 }: PalletChartProps) {
     </div>
   );
 }
-
-
-

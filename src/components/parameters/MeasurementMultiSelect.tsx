@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 // =============================================================================
 // src/components/parameters/MeasurementMultiSelect.tsx
-// Çoklu Ölçüm Tipi Seçim Bileşeni
+// Ã‡oklu Ã–lÃ§Ã¼m Tipi SeÃ§im BileÅŸeni
 //
-// Checkbox tabanlı özel dropdown. Native <select multiple> yerine bu
-// bileşen kullanıldı çünkü:
-// 1. Daha iyi UX (checkbox'lar, "Tümünü Seç/Kaldır")
-// 2. Vue uygulamasındaki PrimeVue MultiSelect davranışını taklit eder
-// 3. Tailwind ile tam özelleştirilebilir
+// Checkbox tabanlÄ± Ã¶zel dropdown. Native <select multiple> yerine bu
+// bileÅŸen kullanÄ±ldÄ± Ã§Ã¼nkÃ¼:
+// 1. Daha iyi UX (checkbox'lar, "TÃ¼mÃ¼nÃ¼ SeÃ§/KaldÄ±r")
+// 2. Vue uygulamasÄ±ndaki PrimeVue MultiSelect davranÄ±ÅŸÄ±nÄ± taklit eder
+// 3. Tailwind ile tam Ã¶zelleÅŸtirilebilir
 // =============================================================================
 
 import { useState, useRef, useEffect } from "react";
@@ -33,7 +33,7 @@ export function MeasurementMultiSelect({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Dışarı tıklandığında kapat
+  // DÄ±ÅŸarÄ± tÄ±klandÄ±ÄŸÄ±nda kapat
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -130,7 +130,7 @@ export function MeasurementMultiSelect({
           role="listbox"
           aria-multiselectable="true"
         >
-          {/* Tümünü Seç / Kaldır */}
+          {/* TÃ¼mÃ¼nÃ¼ SeÃ§ / KaldÄ±r */}
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2">
             <span className="text-xs font-medium text-[var(--color-muted)]">
               {selected.length}/{options.length} selected
@@ -143,7 +143,7 @@ export function MeasurementMultiSelect({
               >
                 All
               </button>
-              <span className="text-[var(--color-muted)]">·</span>
+              <span className="text-[var(--color-muted)]">Â·</span>
               <button
                 type="button"
                 onClick={clearAll}
@@ -154,7 +154,7 @@ export function MeasurementMultiSelect({
             </div>
           </div>
 
-          {/* Seçenekler */}
+          {/* SeÃ§enekler */}
           <ul className="max-h-56 overflow-y-auto py-1">
             {options.map((option) => {
               const checked = isSelected(option);
@@ -165,11 +165,11 @@ export function MeasurementMultiSelect({
                   aria-selected={checked}
                   onClick={() => toggleOption(option)}
                   className={clsx(
-                    "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm",
+                    "flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-sm",
                     "transition-colors duration-100",
                     checked
-                      ? "bg-[var(--color-accent)]/10 text-[var(--color-text)]"
-                      : "text-[var(--color-text-secondary)] hover:bg-white/5"
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-text)]"
+                      : "border-transparent text-[var(--color-text-secondary)] hover:bg-white/5"
                   )}
                 >
                   {/* Checkbox */}
@@ -199,3 +199,4 @@ export function MeasurementMultiSelect({
     </div>
   );
 }
+

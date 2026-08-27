@@ -4,22 +4,15 @@
 // SPC — X-Bar Ortalama Grafiği
 //
 // Vue karşılığı: AverageChart.vue
+// SSL Dokümanı (Section 2.2.2) uyumu:
+//   - PlotLine etiketleri SOL tarafta (align: "left")
+//   - "Mean" → "Nominal Value" (SSL dokümandaki terminoloji)
+//   - Y ekseni: Sarı geniş bant (Mon.Min–Mon.Max), Yeşil dar bant (LCL–UCL)
+//   - Etiket sırası (üstten alta): Max, UCL, Nominal Value, LCL, Min
 //
 // Özellikler:
 //   - useChartReflow: ResizeObserver ile otomatik reflow
 //   - boostThreshold: 1000+ grup için WebGL hızlandırma
-//   - Y ekseni:
-//       plotBands (renkli alanlar):
-//         - SARI geniş bant: monitoringMin – monitoringMax
-//         - YEŞİL dar bant:  lcl – ucl
-//       plotLines (referans çizgileri):
-//         - monitoringMax: sarı çizgi (üst izleme limiti)
-//         - ucl:           yeşil çizgi (kontrol üst limiti)
-//         - mean:          kırmızı kesikli (genel ortalama)
-//         - lcl:           yeşil çizgi (kontrol alt limiti)
-//         - monitoringMin: sarı çizgi (alt izleme limiti)
-//   - Seri: grup ortalama değerleri (x-bar) — mavi çizgi
-//   - Out-of-control noktaları kırmızı işaretlenir
 // =============================================================================
 
 import { useMemo, useRef } from "react";
@@ -68,28 +61,26 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
         title: { text: undefined },
 
         // ─── plotBands: Renkli dolgulu alanlar ──────────────────────────────
-        // "from" ve "to" değerleri Y eksenindeki koordinatları belirtir.
-        // zIndex: bandın grafik elemanlarına göre sırası (düşük = arkada)
         plotBands: [
           // SARI geniş bant: monitoringMin – monitoringMax
           {
             from: series.monitoringMin,
             to:   series.monitoringMax,
-            color: "rgba(234, 179, 8, 0.08)",    // soluk sarı
+            color: "rgba(234, 179, 8, 0.30)",
             zIndex: 1,
           },
           // YEŞİL dar bant: lcl – ucl
           {
             from: series.lcl,
             to:   series.ucl,
-            color: "rgba(34, 197, 94, 0.12)",    // soluk yeşil
+            color: "rgba(34, 197, 94, 0.28)",
             zIndex: 2,
           },
         ],
 
-        // ─── plotLines: Referans sınır çizgileri ────────────────────────────
+        // ─── plotLines: Referans sınır çizgileri (SOL etiket — SSL uyumu) ──
         plotLines: [
-          // Monitoring Max → Sarı üst izleme limiti
+          // Max → Sarı üst monitoring (SOL)
           {
             value: series.monitoringMax,
             color: "#eab308",
@@ -97,12 +88,13 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `Mon.Max ${series.monitoringMax.toFixed(2)}`,
-              align: "right",
-              style: { color: "#eab308", fontSize: "9px", fontWeight: "600" },
+              text: "Max",
+              align: "left",
+              x: 5,
+              style: { color: "#eab308", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // UCL → Yeşil kontrol üst limiti
+          // UCL → Yeşil kontrol üst limiti (SOL)
           {
             value: series.ucl,
             color: "#22c55e",
@@ -110,12 +102,13 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `UCL ${series.ucl.toFixed(2)}`,
-              align: "right",
-              style: { color: "#22c55e", fontSize: "9px", fontWeight: "600" },
+              text: "UCL",
+              align: "left",
+              x: 5,
+              style: { color: "#22c55e", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // Mean → Kırmızı kesikli genel ortalama
+          // Nominal Value (Mean) → Kırmızı kesikli (SOL) — SSL terminolojisi
           {
             value: series.mean,
             color: "#ef4444",
@@ -123,12 +116,13 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             dashStyle: "Dash",
             zIndex: 5,
             label: {
-              text: `Mean ${series.mean.toFixed(2)}`,
-              x: 40,
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: "Nominal Value",
+              align: "left",
+              x: 5,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // LCL → Yeşil kontrol alt limiti
+          // LCL → Yeşil kontrol alt limiti (SOL)
           {
             value: series.lcl,
             color: "#22c55e",
@@ -136,13 +130,14 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `LCL ${series.lcl.toFixed(2)}`,
-              align: "right",
+              text: "LCL",
+              align: "left",
+              x: 5,
               y: 12,
-              style: { color: "#22c55e", fontSize: "9px", fontWeight: "600" },
+              style: { color: "#22c55e", fontSize: "9px", fontWeight: "700" },
             },
           },
-          // Monitoring Min → Sarı alt izleme limiti
+          // Min → Sarı alt monitoring (SOL)
           {
             value: series.monitoringMin,
             color: "#eab308",
@@ -150,10 +145,11 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `Mon.Min ${series.monitoringMin.toFixed(2)}`,
-              align: "right",
+              text: "Min",
+              align: "left",
+              x: 5,
               y: 12,
-              style: { color: "#eab308", fontSize: "9px", fontWeight: "600" },
+              style: { color: "#eab308", fontSize: "9px", fontWeight: "700" },
             },
           },
         ],
@@ -163,8 +159,7 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        formatter: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        function (this: any) {
+        formatter: function (this: any) {
           const g = series.groups[this.point.index];
           const status =
             g.avg > series.ucl || g.avg < series.lcl
@@ -202,7 +197,6 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
           boostThreshold: 1000,
           data: avgData.map((avg) => ({
             y: avg,
-            // Out-of-control noktaları kırmızı işaretlenir
             marker: {
               fillColor:
                 avg > series.ucl || avg < series.lcl ? "#ef4444" : undefined,
@@ -225,5 +219,3 @@ export function SpcAverageChart({ series, height = 300 }: SpcAverageChartProps) 
     </div>
   );
 }
-
-

@@ -1,16 +1,15 @@
-"use client";
+﻿"use client";
 // =============================================================================
 // src/components/charts/individual/IndividualValuesLayout.tsx
 // Individual Values Görünüm Düzeni
 //
 // Seçilen her ölçüm tipi için bir satır oluşturur:
-//   [Sol %30: Histogram] | [Sağ %70: Timeline]
+//   [Sol ~30%: Histogram "Short Term Angle a1 Population"]
+//   [Sağ ~70%: Timeline  "Short Term Angle a1 Values"   ]
 //
-// Vue karşılığı:
-//   <b-row v-for="measurement in individualValues">
-//     <b-col cols="4"><HorizontalBarChart /></b-col>
-//     <b-col cols="8"><ControlChart /></b-col>
-//   </b-row>
+// Orijinal Vue başlık formatı korundu:
+//   Histogram → "{ölçümAdı} Population"
+//   Timeline  → "{ölçümAdı} Values"
 // =============================================================================
 
 import { ChartCard } from "../shared/ChartCard";
@@ -41,7 +40,7 @@ export function IndividualValuesLayout({ series }: IndividualValuesLayoutProps) 
 
         return (
           <div key={s.measureTypeId} className="flex flex-col gap-4">
-            {/* ── Ölçüm Adı Başlığı ───────────────────────────────────── */}
+            {/* ═══ Ölçüm Adı Ayırıcı Başlık ═══════════════════════════════ */}
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-[var(--color-border)]" />
               <span className="text-xs font-semibold tracking-widest uppercase text-[var(--color-muted)]">
@@ -50,28 +49,30 @@ export function IndividualValuesLayout({ series }: IndividualValuesLayoutProps) 
               <div className="h-px flex-1 bg-[var(--color-border)]" />
             </div>
 
-            {/* ── İki Sütun: Histogram + Timeline ────────────────────── */}
+            {/* ═══ İki Sütun: Histogram + Timeline ════════════════════════ */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_7fr]">
-              {/* Histogram — Sol %30 */}
+              {/* Histogram — Sol ~30% */}
+              {/* Başlık: "{ölçümAdı} Population" (orijinal Vue formatı) */}
               <ChartCard
-                title="Distribution"
+                title={`${s.measurementName} Population`}
                 badges={[
-                  { label: "n", value: s.dataPoints.length.toLocaleString(), color: "gray" },
+                  { label: "n",   value: s.dataPoints.length.toLocaleString(), color: "gray" },
                   { label: "NOK", value: `${nokRate}%`, color: s.nokCount > 0 ? "red" : "green" },
                 ]}
               >
                 <HistogramChart series={s} height={280} />
               </ChartCard>
 
-              {/* Timeline — Sağ %70 */}
+              {/* Timeline — Sağ ~70% */}
+              {/* Başlık: "{ölçümAdı} Values" (orijinal Vue formatı) */}
               <ChartCard
-                title={`${s.measurementName} — Values Over Time`}
+                title={`${s.measurementName} Values`}
                 badges={[
-                  { label: "UCL", value: fmt(s.ucl),           color: "green"  },
-                  { label: "Mean",value: fmt(s.mean),           color: "yellow" },
-                  { label: "LCL", value: fmt(s.lcl),           color: "green"  },
-                  { label: "Max", value: fmt(s.monitoringMax),  color: "red"    },
-                  { label: "Min", value: fmt(s.monitoringMin),  color: "blue"   },
+                  { label: "UCL",  value: fmt(s.ucl),          color: "green"  },
+                  { label: "Mean", value: fmt(s.mean),          color: "yellow" },
+                  { label: "LCL",  value: fmt(s.lcl),          color: "green"  },
+                  { label: "Max",  value: fmt(s.monitoringMax), color: "red"    },
+                  { label: "Min",  value: fmt(s.monitoringMin), color: "blue"   },
                 ]}
               >
                 <TimelineChart series={s} height={280} />

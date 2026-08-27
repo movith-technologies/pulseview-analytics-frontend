@@ -4,16 +4,16 @@
 // Compare Analysis Multi-Series Line Chart
 //
 // Vue karşılığı: CompareAnalysisChart.vue
+// SSL Dokümanı (Section 2.2.4) uyumu:
+//   - PlotLine etiketleri SOL tarafta (align: "left", x: 5)
+//   - Etiketler: Max, Mean, Min (sol tarafta kırmızı/turuncu)
+//   - X ekseni: datetime (06:00, 13:30...)
+//   - Legend alt tarafta seri isimleri
 //
 // Özellikler:
 //   - useChartReflow: ResizeObserver ile otomatik reflow
-//   - Datetime X ekseni (Unix ms, timezone offset uygulanmış)
-//   - Multi-series: her ölçüm tipi farklı renkli çizgi
-//   - Referans çizgileri: ilk serinin monitoringMax/Min/mean
-//   - Shared tooltip: tüm serilerin değerlerini birlikte gösterir
-//   - Mouse wheel zoom (Y ekseni)
 //   - boostThreshold: 1000+ nokta için WebGL
-//   - turboThreshold: 30000
+//   - Shared tooltip ile tüm serilerin değerleri birlikte
 // =============================================================================
 
 import { useMemo, useRef } from "react";
@@ -91,7 +91,7 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
         usePreallocated: true,
       },
 
-      // ═══ X Ekseni: Zaman ══════════════════════════════════════════════════
+      // ═══ X Ekseni: Datetime (SSL: 06:00, 13:30...) ═══════════════════════
       xAxis: {
         type: "datetime",
         lineColor: "#30363d",
@@ -104,7 +104,7 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
         crosshair: { color: "rgba(255,255,255,0.1)", width: 1 },
       },
 
-      // ═══ Y Ekseni: Değerler + Referans Çizgileri ═════════════════════════
+      // ═══ Y Ekseni: SOL Etiketli Referans Çizgileri (SSL uyumu) ═══════════
       yAxis: {
         gridLineColor: "#21262d",
         labels: { style: { color: "#8b949e", fontSize: "10px" } },
@@ -112,6 +112,7 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
         opposite: false,
 
         plotLines: [
+          // Max → SOL etiket
           {
             value: ref.monitoringMax,
             color: "#ef4444",
@@ -119,11 +120,13 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `Max ${ref.monitoringMax.toFixed(2)}`,
-              align: "right",
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: "Max",
+              align: "left",
+              x: 5,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
+          // Mean → SOL etiket
           {
             value: ref.mean,
             color: "#f97316",
@@ -131,11 +134,13 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
             dashStyle: "Dash",
             zIndex: 5,
             label: {
-              text: `Mean ${ref.mean.toFixed(2)}`,
-              x: 40,
-              style: { color: "#f97316", fontSize: "9px", fontWeight: "600" },
+              text: "Mean",
+              align: "left",
+              x: 5,
+              style: { color: "#f97316", fontSize: "9px", fontWeight: "700" },
             },
           },
+          // Min → SOL etiket
           {
             value: ref.monitoringMin,
             color: "#ef4444",
@@ -143,10 +148,11 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
             dashStyle: "Solid",
             zIndex: 5,
             label: {
-              text: `Min ${ref.monitoringMin.toFixed(2)}`,
-              align: "right",
-              y: 15,
-              style: { color: "#ef4444", fontSize: "9px", fontWeight: "600" },
+              text: "Min",
+              align: "left",
+              x: 5,
+              y: 14,
+              style: { color: "#ef4444", fontSize: "9px", fontWeight: "700" },
             },
           },
         ],
@@ -159,19 +165,16 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
         backgroundColor: "#21262d",
         borderColor: "#30363d",
         style: { color: "#e6edf3", fontSize: "12px" },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: function (this: any) {
           if (!this.points || this.points.length === 0) return "";
 
           let html = "";
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           this.points.forEach((pt: any) => {
             const color = pt.series.color as string;
             html += `<span style="color:${color}">●</span> `;
             html += `${pt.series.name}: <b>${(pt.y as number).toFixed(4)}</b><br/>`;
           });
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const firstPt = (this.points[0].point as any);
           const custom = firstPt?.custom as { pallet: number | null; date: string } | undefined;
 
@@ -185,8 +188,12 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
         },
       },
 
+      // ═══ Legend: Alt tarafta seri isimleri (SSL uyumu) ═══════════════════
       legend: {
         enabled: true,
+        align: "center",
+        verticalAlign: "bottom",
+        layout: "horizontal",
         itemStyle: { color: "#8b949e", fontSize: "11px" },
         itemHoverStyle: { color: "#e6edf3" },
       },
@@ -222,4 +229,3 @@ export function CompareChart({ seriesArray, height = 520 }: CompareChartProps) {
     </div>
   );
 }
-
